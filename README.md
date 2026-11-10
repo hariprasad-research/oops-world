@@ -71,66 +71,7 @@
 - **Gestures**: Tap or swipe anywhere on the left half to slide, tap right half to jump!
 - **Haptic Vibration**: Native Android vibration feedback on impacts and pickups.
 
----
 
-## 📁 Project Structure
-
-```
-OOPS! WORLD/
-├── index.html          # Web game HTML5 canvas container
-├── styles.css          # Responsive fullscreen styling
-├── src/
-│   ├── main.js         # Game entry point and initialization
-│   ├── game.js         # Core game loop, state machine & input handling
-│   ├── player.js       # Bobo character physics, states & animations
-│   ├── world.js        # Procedural terrain, parallax & weather engine
-│   ├── obstacles.js    # Traps, rocks, spikes, logs & spring pads
-│   ├── enemies.js      # Cartoon enemies & head stomp mechanics
-│   ├── powerups.js     # Collectibles, coins, gems & abilities
-│   ├── events.js       # Dynamic surprise disasters & warning systems
-│   ├── ui.js           # Menus, HUD, shop, settings & touch controls
-│   ├── audio.js        # Procedural Web Audio API sound effects & music
-│   ├── storage.js      # LocalStorage save system & unlockables
-│   └── utils.js        # Math helpers, camera shake & particle engine
-├── app/                # Android companion application (wraps web game)
-└── README.md           # Documentation
-```
-
----
-
-## 🚀 Setup & Deployment
-
-### 1. Local Browser Testing
-Simply open `index.html` in any modern web browser or serve via a local HTTP server:
-```bash
-# Using Python
-python3 -m http.server 8000
-
-# Using Node.js
-npx serve .
-```
-Navigate to `http://localhost:8000`.
-
-### 2. Deployment to Vercel / Netlify / GitHub Pages
-1. Push this repository to GitHub.
-2. Link your repository in [Vercel](https://vercel.com) or [Netlify](https://netlify.com).
-3. Set the build command to empty (static site) and the output directory to `./` (root).
-4. Deploy! The game is immediately live at 60 FPS.
-
-### 3. Embedding into 5key Website
-Embed the game seamlessly via an iframe:
-```html
-<iframe
-  src="https://your-deployment-url.vercel.app"
-  width="100%"
-  height="600"
-  frameborder="0"
-  allow="autoplay; vibration"
-  style="border-radius: 12px; overflow: hidden;"
-></iframe>
-```
-
----
 
 ## 📱 Android App Compilation
 
@@ -139,7 +80,3 @@ This project also includes an Android project that runs the game in full-screen 
 gradle :app:assembleDebug
 ```
 
----
-
-## 📄 License
-MIT License. Created for the **5key gaming platform**.

@@ -98,39 +98,6 @@ OOPS! WORLD/
 
 ---
 
-## 🚀 Setup & Deployment
-
-### 1. Local Browser Testing
-Simply open `index.html` in any modern web browser or serve via a local HTTP server:
-```bash
-# Using Python
-python3 -m http.server 8000
-
-# Using Node.js
-npx serve .
-```
-Navigate to `http://localhost:8000`.
-
-### 2. Deployment to Vercel / Netlify / GitHub Pages
-1. Push this repository to GitHub.
-2. Link your repository in [Vercel](https://vercel.com) or [Netlify](https://netlify.com).
-3. Set the build command to empty (static site) and the output directory to `./` (root).
-4. Deploy! The game is immediately live at 60 FPS.
-
-### 3. Embedding into 5key Website
-Embed the game seamlessly via an iframe:
-```html
-<iframe
-  src="https://your-deployment-url.vercel.app"
-  width="100%"
-  height="600"
-  frameborder="0"
-  allow="autoplay; vibration"
-  style="border-radius: 12px; overflow: hidden;"
-></iframe>
-```
-
----
 
 ## 📱 Android App Compilation
 
