@@ -75,8 +75,32 @@
 
 ## 📱 Android App Compilation
 
-This project also includes an Android project that runs the game in full-screen edge-to-edge mode with hardware acceleration and native vibration support:
+This project includes an Android project that runs the game in full-screen landscape mode with hardware acceleration and native vibration support:
 ```bash
 gradle :app:assembleDebug
 ```
+
+---
+
+## 🤖 Automated CI/CD: GitHub Actions & Releases
+
+Whenever you push commits to the `main` branch, the `.github/workflows/android-release.yml` workflow automatically:
+1. Sets up JDK 21 and the Android build environment.
+2. Compiles a production-ready Android APK (`:app:assembleRelease`).
+3. Resolves the semantic version tag (e.g. `v1.0.0`, `v1.0.1`, avoiding duplicates).
+4. Publishes a new **GitHub Release** and attaches **ONLY** the signed `.apk` file (`OOPS-WORLD-v1.0.0.apk`) for public download.
+
+### 🔐 Custom Signing Keystore (Optional)
+
+The CI workflow is fully self-sufficient and works **out of the box** without setup. If you wish to sign your releases with your official Android upload key:
+
+1. Export your `.jks` keystore to base64:
+   ```bash
+   base64 -w 0 my-upload-key.jks
+   ```
+2. In your GitHub repository, go to **Settings** → **Secrets and variables** → **Actions**.
+3. Create the following repository secrets:
+   - `KEYSTORE_BASE64`: Base64 encoded content of your keystore file.
+   - `STORE_PASSWORD`: Password for your keystore.
+   - `KEY_PASSWORD`: Password for your key alias.
 
