@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#FF5722" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>OOPS! WORLD - Endless Survival Game</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <!-- Rotate Your Phone Overlay for Mobile Portrait Mode -->
+  <div id="rotate-device-overlay">
+    <div class="rotate-card">
+      <div class="phone-rotate-anim">
+        <svg viewBox="0 0 100 100" class="rotate-svg">
+          <rect x="32" y="16" width="36" height="68" rx="6" class="phone-body" />
+          <rect x="37" y="24" width="26" height="48" rx="2" class="phone-screen" />
+          <line x1="44" y1="20" x2="56" y2="20" class="phone-speaker" />
+          <circle cx="50" cy="77" r="2.5" class="phone-button" />
+        </svg>
+      </div>
+      <h2 class="rotate-title">ROTATE YOUR DEVICE</h2>
+      <p class="rotate-subtitle">OOPS! WORLD requires Landscape Mode for widescreen endless survival running.</p>
+      <div class="rotate-badge">🔄 Turn phone sideways to continue</div>
+    </div>
+  </div>
+
+  <!-- Load Game Scripts in dependency order (CORS-safe for file:/// and web) -->
+  <script src="src/utils.js"></script>
+  <script src="src/storage.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/player.js"></script>
+  <script src="src/world.js"></script>
+  <script src="src/obstacles.js"></script>
+  <script src="src/enemies.js"></script>
+  <script src="src/powerups.js"></script>
+  <script src="src/events.js"></script>
+  <script src="src/ui.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>

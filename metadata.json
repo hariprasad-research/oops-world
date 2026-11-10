@@ -1,0 +1,6 @@
+{
+  "name": "OOPS! WORLD",
+  "description": "An endless 2D survival cartoon adventure game where Bobo dodges hazards, outruns disasters, and collects coins!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
