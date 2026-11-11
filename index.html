@@ -12,6 +12,260 @@
 <body>
   <div id="game-container">
     <canvas id="gameCanvas"></canvas>
+
+    <!-- Futuristic Geometric Mobile Control Panels (Exact Match to Visual Reference) -->
+    <div id="mobile-controls" class="mobile-controls-overlay" aria-hidden="true">
+      <!-- LEFT CONTROL: SLIDE (Electric Cyan & Deep Blue) -->
+      <div id="ctrl-slide" class="geo-panel geo-slide" role="button" aria-label="Slide Under Hazards" tabindex="0">
+        <svg viewBox="0 0 320 114" class="geo-ctrl-svg" preserveAspectRatio="none">
+          <defs>
+            <filter id="slide-cyan-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3.2" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="slide-outer-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="0" stdDeviation="5.5" flood-color="#00f0ff" flood-opacity="0.88" />
+            </filter>
+            <linearGradient id="slide-glass-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#081f3b" stop-opacity="0.94" />
+              <stop offset="50%" stop-color="#041328" stop-opacity="0.96" />
+              <stop offset="100%" stop-color="#020814" stop-opacity="0.98" />
+            </linearGradient>
+            <linearGradient id="slide-border-grad" x1="0%" y1="0%" x2="100%" y2="50%">
+              <stop offset="0%" stop-color="#00f0ff" />
+              <stop offset="45%" stop-color="#00d2ff" />
+              <stop offset="80%" stop-color="#0088ff" />
+              <stop offset="100%" stop-color="#0055ff" />
+            </linearGradient>
+          </defs>
+
+          <!-- Trailing Cyber Line extending right -->
+          <line x1="305" y1="96" x2="340" y2="96" stroke="#00f0ff" stroke-width="2.5" opacity="0.85" />
+          <line x1="12" y1="104" x2="4" y2="104" stroke="#00f0ff" stroke-width="2" opacity="0.8" />
+
+          <!-- Outer Polygon Panel Shape -->
+          <path class="geo-panel-base"
+                d="M 14 36
+                   L 34 10
+                   L 142 10
+                   L 182 46
+                   L 294 46
+                   L 312 64
+                   L 312 80
+                   L 298 94
+                   L 218 94
+                   L 204 106
+                   L 34 106
+                   L 14 84
+                   Z"
+                fill="url(#slide-glass-bg)"
+                stroke="url(#slide-border-grad)"
+                stroke-width="3.5"
+                filter="url(#slide-outer-glow)" />
+
+          <!-- Inner Cyan Tech Border Inset (Multi-Layer Depth) -->
+          <path class="geo-inner-border"
+                d="M 22 40
+                   L 38 18
+                   L 138 18
+                   L 176 52
+                   L 288 52
+                   L 304 68
+                   L 304 76
+                   L 292 88
+                   L 220 88
+                   L 208 98
+                   L 38 98
+                   L 22 80
+                   Z"
+                fill="none"
+                stroke="#00f0ff"
+                stroke-width="1.2"
+                stroke-opacity="0.6" />
+
+          <!-- Top-left Chamfer Accent Pip & Tech Rectangles -->
+          <line x1="8" y1="26" x2="24" y2="10" stroke="#00f0ff" stroke-width="2.5" opacity="0.9" />
+          <rect x="38" y="8" width="16" height="3" fill="#00f0ff" />
+          <rect x="58" y="8" width="8" height="3" fill="#00f0ff" opacity="0.7" />
+
+          <!-- Upper shelf cyan accent bar over SLIDE -->
+          <path d="M 172 42 L 286 42" stroke="#00f0ff" stroke-width="3.5" stroke-linecap="round" filter="url(#slide-cyan-glow)" />
+          <path d="M 186 37 L 230 37" stroke="#0088ff" stroke-width="2" opacity="0.8" />
+
+          <!-- Chevron Energy Pulse Halo (Geometric subtle glow halo) -->
+          <polygon class="chevron-pulse-halo"
+                   points="50,26 86,58 122,26 104,26 86,42 68,26"
+                   fill="none"
+                   stroke="#00f0ff"
+                   stroke-width="3.5"
+                   filter="url(#slide-cyan-glow)" />
+
+          <!-- TWO LARGE DOWNWARD CHEVRONS (White + Cyan Glow) -->
+          <polygon class="chevron-main chevron-top"
+                   points="56,30 86,58 116,30 104,30 86,45 68,30"
+                   fill="#FFFFFF"
+                   filter="url(#slide-cyan-glow)" />
+          <polygon points="56,30 86,58 116,30 104,30 86,45 68,30"
+                   fill="none"
+                   stroke="#00f0ff"
+                   stroke-width="1.5" />
+
+          <polygon class="chevron-main chevron-bottom"
+                   points="56,56 86,84 116,56 104,56 86,71 68,56"
+                   fill="#FFFFFF"
+                   filter="url(#slide-cyan-glow)" />
+          <polygon points="56,56 86,84 116,56 104,56 86,71 68,56"
+                   fill="none"
+                   stroke="#00f0ff"
+                   stroke-width="1.5" />
+
+          <!-- SLIDE TEXT (Bold, Heavy, Italic, White + Cyan Glow) -->
+          <text x="236" y="78"
+                text-anchor="middle"
+                class="geo-label-text"
+                font-family="system-ui, -apple-system, 'Impact', 'Segoe UI Black', sans-serif"
+                font-weight="900"
+                font-style="italic"
+                font-size="30"
+                fill="#FFFFFF"
+                letter-spacing="2"
+                filter="url(#slide-cyan-glow)">SLIDE</text>
+
+          <!-- Three slanted cyan cooling vents / hazard slashes at bottom right (///) -->
+          <line x1="250" y1="94" x2="262" y2="80" stroke="#00f0ff" stroke-width="4" stroke-linecap="round" />
+          <line x1="264" y1="94" x2="276" y2="80" stroke="#00f0ff" stroke-width="4" stroke-linecap="round" />
+          <line x1="278" y1="94" x2="290" y2="80" stroke="#00f0ff" stroke-width="4" stroke-linecap="round" />
+
+          <!-- Bottom cyan neon highlight accent -->
+          <line x1="42" y1="106" x2="190" y2="106" stroke="#00f0ff" stroke-width="2.8" opacity="0.9" filter="url(#slide-cyan-glow)" />
+        </svg>
+      </div>
+
+      <!-- RIGHT CONTROL: JUMP (Neon Lime-Green & Deep Emerald) -->
+      <div id="ctrl-jump" class="geo-panel geo-jump" role="button" aria-label="Jump Over Obstacles" tabindex="0">
+        <svg viewBox="0 0 320 114" class="geo-ctrl-svg" preserveAspectRatio="none">
+          <defs>
+            <filter id="jump-lime-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3.2" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="jump-outer-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="0" stdDeviation="5.5" flood-color="#39ff14" flood-opacity="0.88" />
+            </filter>
+            <linearGradient id="jump-glass-bg" x1="100%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#062b16" stop-opacity="0.94" />
+              <stop offset="50%" stop-color="#031a0d" stop-opacity="0.96" />
+              <stop offset="100%" stop-color="#010c06" stop-opacity="0.98" />
+            </linearGradient>
+            <linearGradient id="jump-border-grad" x1="100%" y1="0%" x2="0%" y2="50%">
+              <stop offset="0%" stop-color="#39ff14" />
+              <stop offset="45%" stop-color="#00ff66" />
+              <stop offset="80%" stop-color="#10ac84" />
+              <stop offset="100%" stop-color="#05c46b" />
+            </linearGradient>
+          </defs>
+
+          <!-- Trailing Cyber Line extending left -->
+          <line x1="15" y1="96" x2="-20" y2="96" stroke="#39ff14" stroke-width="2.5" opacity="0.85" />
+          <line x1="308" y1="104" x2="316" y2="104" stroke="#39ff14" stroke-width="2" opacity="0.8" />
+
+          <!-- Outer Polygon Panel Shape (Inverted Mirror of SLIDE) -->
+          <path class="geo-panel-base"
+                d="M 10 64
+                   L 26 46
+                   L 138 46
+                   L 178 10
+                   L 286 10
+                   L 306 36
+                   L 306 84
+                   L 286 106
+                   L 116 106
+                   L 102 94
+                   L 22 94
+                   L 10 80
+                   Z"
+                fill="url(#jump-glass-bg)"
+                stroke="url(#jump-border-grad)"
+                stroke-width="3.5"
+                filter="url(#jump-outer-glow)" />
+
+          <!-- Inner Lime Tech Border Inset (Multi-Layer Depth) -->
+          <path class="geo-inner-border"
+                d="M 18 68
+                   L 32 52
+                   L 144 52
+                   L 182 18
+                   L 282 18
+                   L 298 40
+                   L 298 80
+                   L 282 98
+                   L 112 98
+                   L 100 88
+                   L 28 88
+                   L 18 76
+                   Z"
+                fill="none"
+                stroke="#39ff14"
+                stroke-width="1.2"
+                stroke-opacity="0.6" />
+
+          <!-- Top-right Chamfer Accent Pip -->
+          <line x1="312" y1="26" x2="296" y2="10" stroke="#39ff14" stroke-width="2.5" opacity="0.9" />
+
+          <!-- Three lime tech dashes above JUMP on the upper-left shelf -->
+          <rect x="74" y="36" width="12" height="4" fill="#39ff14" filter="url(#jump-lime-glow)" />
+          <rect x="92" y="36" width="12" height="4" fill="#39ff14" filter="url(#jump-lime-glow)" />
+          <rect x="110" y="36" width="12" height="4" fill="#39ff14" filter="url(#jump-lime-glow)" />
+
+          <!-- Chevron Energy Pulse Halo (Geometric subtle glow halo) -->
+          <polygon class="chevron-pulse-halo"
+                   points="198,78 234,44 270,78 252,78 234,62 216,78"
+                   fill="none"
+                   stroke="#39ff14"
+                   stroke-width="3.5"
+                   filter="url(#jump-lime-glow)" />
+
+          <!-- Three slanted lime-green cooling vents / hazard slashes at bottom left (///) -->
+          <line x1="32" y1="94" x2="44" y2="80" stroke="#39ff14" stroke-width="4" stroke-linecap="round" />
+          <line x1="46" y1="94" x2="58" y2="80" stroke="#39ff14" stroke-width="4" stroke-linecap="round" />
+          <line x1="60" y1="94" x2="72" y2="80" stroke="#39ff14" stroke-width="4" stroke-linecap="round" />
+
+          <!-- JUMP TEXT (Bold, Heavy, Italic, White + Lime Glow) -->
+          <text x="100" y="78"
+                text-anchor="middle"
+                class="geo-label-text"
+                font-family="system-ui, -apple-system, 'Impact', 'Segoe UI Black', sans-serif"
+                font-weight="900"
+                font-style="italic"
+                font-size="30"
+                fill="#FFFFFF"
+                letter-spacing="2"
+                filter="url(#jump-lime-glow)">JUMP</text>
+
+          <!-- TWO LARGE UPWARD CHEVRONS (White + Lime Glow) -->
+          <polygon class="chevron-main chevron-top"
+                   points="204,50 234,22 264,50 252,50 234,35 216,50"
+                   fill="#FFFFFF"
+                   filter="url(#jump-lime-glow)" />
+          <polygon points="204,50 234,22 264,50 252,50 234,35 216,50"
+                   fill="none"
+                   stroke="#39ff14"
+                   stroke-width="1.5" />
+
+          <polygon class="chevron-main chevron-bottom"
+                   points="204,76 234,48 264,76 252,76 234,61 216,76"
+                   fill="#FFFFFF"
+                   filter="url(#jump-lime-glow)" />
+          <polygon points="204,76 234,48 264,76 252,76 234,61 216,76"
+                   fill="none"
+                   stroke="#39ff14"
+                   stroke-width="1.5" />
+
+          <!-- Bottom lime neon highlight accent -->
+          <line x1="130" y1="106" x2="278" y2="106" stroke="#39ff14" stroke-width="2.8" opacity="0.9" filter="url(#jump-lime-glow)" />
+        </svg>
+      </div>
+    </div>
   </div>
 
   <!-- Rotate Your Phone Overlay for Mobile Portrait Mode -->

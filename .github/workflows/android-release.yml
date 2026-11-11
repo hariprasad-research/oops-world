@@ -133,27 +133,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: OOPS! WORLD ${{ env.RELEASE_TAG }}
+          name: OOPS! WORLD ${{ env.RELEASE_TAG }} – Android Release
           draft: false
           prerelease: false
           make_latest: true
-          generate_release_notes: true
+          generate_release_notes: false
           body: |
-            ## 🎮 OOPS! WORLD ${{ env.RELEASE_TAG }}
+            Official Android release build of OOPS! WORLD — 2D endless cartoon survival game!
 
-            Official Android release build of **OOPS! WORLD** — 2D endless cartoon survival game!
+            Release Asset:
+            - Download File: ${{ env.APK_FILENAME }}
+            - File Size: ${{ env.APK_SIZE }}
+            - SHA-256 Checksum: ${{ env.APK_SHA256 }}
 
-            ### 📦 Release Asset
-            - **Download File**: [`${{ env.APK_FILENAME }}`](https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ env.APK_FILENAME }})
-            - **File Size**: `${{ env.APK_SIZE }}`
-            - **SHA-256 Checksum**: `${{ env.APK_SHA256 }}`
-            - **Commit**: `${{ github.sha }}`
-
-            ### 📲 Installation Instructions
-            1. Download `${{ env.APK_FILENAME }}` directly to your Android device.
-            2. Open the downloaded `.apk` file.
-            3. Tap **Install** (if prompted by Android, permit "Install unknown apps" for your browser/file manager).
-            4. Launch **OOPS! WORLD** and play!
+            Installation Instructions:
+            1. Download the APK.
+            2. Open the downloaded APK.
+            3. Install the application.
+            4. Launch OOPS! WORLD and play!
           files: ${{ env.APK_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

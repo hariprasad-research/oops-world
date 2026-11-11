@@ -7,7 +7,7 @@ class Game {
     this.ctx = canvas.getContext('2d');
 
     this.width = 960;
-    this.height = 540;
+    this.height = 620;
 
     const {
       StorageManager,
@@ -50,6 +50,7 @@ class Game {
     this.isOrientationBlocked = false;
     this.initCanvas();
     this.setupInputs();
+    this.setupGeometricControls();
   }
 
   async requestLandscapeAndFullscreen() {
@@ -113,10 +114,10 @@ class Game {
         }
       }
 
-      // Use complete available screen dimensions in landscape mode without squeezing
-      this.height = 540;
+      // Use complete available screen dimensions in landscape mode with 160px ground depth
+      this.height = 620;
       const aspect = isPortrait ? 1.7778 : Math.max(1.33, Math.min(2.4, containerW / containerH));
-      this.width = Math.round(540 * aspect);
+      this.width = Math.round(this.height * aspect);
 
       this.canvas.style.width = '100vw';
       this.canvas.style.height = '100vh';
@@ -223,6 +224,115 @@ class Game {
 
     window.addEventListener('mouseup', () => {
       this.handlePointerUp('mouse');
+    });
+  }
+
+  setupGeometricControls() {
+    const slideBtn = document.getElementById('ctrl-slide');
+    const jumpBtn = document.getElementById('ctrl-jump');
+    if (!slideBtn || !jumpBtn) return;
+
+    const triggerHaptic = (ms = 22) => {
+      try {
+        if (window.AndroidBridge && window.AndroidBridge.vibrate) {
+          window.AndroidBridge.vibrate(ms);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(ms);
+        }
+      } catch (err) {}
+    };
+
+    // --- LEFT CONTROL: SLIDE ---
+    // Activates while pressed, cancels on release
+    const handleSlideStart = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (this.state !== 'playing') return;
+      slideBtn.classList.add('pressed');
+      this.ui.touchButtons.slide.pressed = true;
+      this.player.slide();
+      triggerHaptic(20);
+    };
+
+    const handleSlideEnd = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      slideBtn.classList.remove('pressed');
+      this.ui.touchButtons.slide.pressed = false;
+      if (this.state === 'playing') {
+        this.player.cancelSlide();
+      }
+    };
+
+    // --- RIGHT CONTROL: JUMP ---
+    // Activates on touch/press
+    const handleJumpStart = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (this.state !== 'playing') return;
+      jumpBtn.classList.add('pressed');
+      this.ui.touchButtons.jump.pressed = true;
+      this.player.jump();
+      triggerHaptic(30);
+    };
+
+    const handleJumpEnd = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      jumpBtn.classList.remove('pressed');
+      this.ui.touchButtons.jump.pressed = false;
+    };
+
+    // Independent multi-touch listeners
+    slideBtn.addEventListener('touchstart', handleSlideStart, { passive: false });
+    slideBtn.addEventListener('touchend', handleSlideEnd, { passive: false });
+    slideBtn.addEventListener('touchcancel', handleSlideEnd, { passive: false });
+
+    jumpBtn.addEventListener('touchstart', handleJumpStart, { passive: false });
+    jumpBtn.addEventListener('touchend', handleJumpEnd, { passive: false });
+    jumpBtn.addEventListener('touchcancel', handleJumpEnd, { passive: false });
+
+    // Pointer/Mouse support for desktop and mouse input
+    slideBtn.addEventListener('mousedown', handleSlideStart);
+    slideBtn.addEventListener('mouseleave', () => {
+      if (slideBtn.classList.contains('pressed')) handleSlideEnd();
+    });
+
+    jumpBtn.addEventListener('mousedown', handleJumpStart);
+    jumpBtn.addEventListener('mouseleave', () => {
+      if (jumpBtn.classList.contains('pressed')) handleJumpEnd();
+    });
+
+    // Safety release to prevent stuck touch inputs
+    const resetAllControls = () => {
+      handleSlideEnd();
+      handleJumpEnd();
+    };
+
+    window.addEventListener('blur', resetAllControls);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) resetAllControls();
+    });
+    window.addEventListener('orientationchange', resetAllControls);
+    window.addEventListener('touchcancel', resetAllControls);
+    window.addEventListener('touchend', (e) => {
+      // If no active touches remain on screen, reset any lingering pressed state
+      if (!e.touches || e.touches.length === 0) {
+        resetAllControls();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (slideBtn.classList.contains('pressed')) handleSlideEnd();
+      if (jumpBtn.classList.contains('pressed')) handleJumpEnd();
     });
   }
 
@@ -376,6 +486,7 @@ class Game {
   update(dt) {
     if (this.isOrientationBlocked) return;
 
+    this.updateMobileControlsVisibility();
     this.camera.update(dt);
     this.ui.update(dt);
 
@@ -392,6 +503,16 @@ class Game {
       this.particles.update(dt);
     } else if (this.state === 'gameover' || this.state === 'menu') {
       this.particles.update(dt);
+    }
+  }
+
+  updateMobileControlsVisibility() {
+    const controls = document.getElementById('mobile-controls');
+    if (!controls) return;
+    const shouldShow = this.state === 'playing' && !this.isOrientationBlocked;
+    if (controls.classList.contains('visible') !== shouldShow) {
+      controls.classList.toggle('visible', shouldShow);
+      controls.setAttribute('aria-hidden', (!shouldShow).toString());
     }
   }
 

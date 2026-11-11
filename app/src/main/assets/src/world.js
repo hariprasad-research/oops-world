@@ -41,7 +41,7 @@ class World {
     }
 
     this.props = [];
-    this.groundY = 460;
+    this.groundY = 420;
     this.chunks = [];
     this.chunkWidth = 220;
 
@@ -196,7 +196,7 @@ class World {
     let targetY = this.groundY;
     if (!isGap) {
       const dy = Utils.randChoice([-30, -15, 0, 15, 30]);
-      targetY = Utils.clamp(lastChunk.y + dy, 400, 480);
+      targetY = Utils.clamp(lastChunk.y + dy, 360, 440);
     }
 
     const newChunk = {

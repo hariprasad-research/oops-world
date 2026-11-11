@@ -88,7 +88,7 @@ Whenever you push commits to the `main` branch, the `.github/workflows/android-r
 1. Sets up JDK 21 and the Android build environment.
 2. Compiles a production-ready Android APK (`:app:assembleRelease`).
 3. Resolves the semantic version tag (e.g. `v1.0.0`, `v1.0.1`, avoiding duplicates).
-4. Publishes a new **GitHub Release** and attaches **ONLY** the signed `.apk` file (`OOPS-WORLD-v1.0.0.apk`) for public download.
+4. Publishes a new **GitHub Release** and attaches **ONLY** the signed `.apk` file (`OOPS-WORLD-v1.0.1.apk`) for public download.
 
 ### 🔐 Custom Signing Keystore (Optional)
 

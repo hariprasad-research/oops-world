@@ -215,39 +215,7 @@ class UIManager {
   }
 
   drawTouchControls(ctx) {
-    ctx.save();
-
-    const sBtn = this.touchButtons.slide;
-    ctx.fillStyle = sBtn.pressed ? 'rgba(255, 71, 87, 0.75)' : 'rgba(255, 71, 87, 0.38)';
-    ctx.strokeStyle = '#FF4757';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(sBtn.x, sBtn.y, sBtn.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('SLIDE ⬇', sBtn.x, sBtn.y);
-
-    const jBtn = this.touchButtons.jump;
-    ctx.fillStyle = jBtn.pressed ? 'rgba(46, 213, 115, 0.75)' : 'rgba(46, 213, 115, 0.38)';
-    ctx.strokeStyle = '#2ED573';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(jBtn.x, jBtn.y, jBtn.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('JUMP ⬆', jBtn.x, jBtn.y);
-
-    ctx.restore();
+    // Replaced by futuristic geometric DOM control panels (#ctrl-slide and #ctrl-jump)
   }
 
   drawMainMenu(ctx) {
