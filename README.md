@@ -1,106 +1,177 @@
 # OOPS! WORLD 🏃💨💥
+### Official 2D Endless Cartoon Survival Runner for the 5key Gaming Platform
 
-**OOPS! WORLD** is a 2D endless survival cartoon adventure game built for the **5key gaming platform**. Play as **Bobo**, an adorable bouncy creature surviving in an ever-changing procedural world packed with hilarious obstacles, cartoon enemies, surprise dynamic disasters, and game-changing power-ups!
+[![Platform](https://img.shields.io/badge/Platform-5key%20Gaming-FF5722?style=for-the-badge&logo=gamepad)](https://github.com)
+[![Version](https://img.shields.io/badge/Release-v1.0.1-2ED573?style=for-the-badge)](https://github.com)
+[![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024%2B)-3DDC84?style=for-the-badge&logo=android)](https://github.com)
+[![Assets](https://img.shields.io/badge/Assets-100%25%20Procedural-00F0FF?style=for-the-badge)](https://github.com)
+[![License](https://img.shields.io/badge/License-MIT-FFA502?style=for-the-badge)](LICENSE)
 
----
-
-## 🎮 Gameplay Features
-
-- **Endless Procedural World**: Infinite terrain generation with fair platforming, rolling hills, floating platforms, and pit gaps across 4 distinct biomes:
-  - 🌲 **Green Haven (Forest)**: Rolling lush hills and pine groves.
-  - 🏜️ **Sunken Dunes (Desert)**: Golden dunes, ancient pyramids, and scorched sands.
-  - ❄️ **Frosty Tundra (Snow)**: Glistening snowbanks and falling flurries.
-  - 🌌 **Cosmic Nebula (Mystic)**: Neon crystals and cosmic starry skies.
-- **Dynamic Weather & Day/Night Cycle**: Smooth transitions between bright sunny days, golden sunsets, starlit nights, torrential downpours, and violent storms with lightning flashes.
-- **Expressive Original Characters**:
-  - **Bobo**: The cute bouncy hero with panic expressions and antenna bounce!
-  - **Pip the Bunny**: Long floppy ears with extended slide duration.
-  - **Kato the Ninja**: Agile feline shinobi with +10% higher jumps.
-  - **Gloop the Alien**: Cosmic gelatin blob with an expanded magnetic field.
-  - **Robo-9**: Titanium retro robot starting with a free mini-shield.
-- **Traps & Hazards**:
-  - 🪨 Boulders & Ground Rocks
-  - 💥 Spikes & Crystal Thorns
-  - ⚠️ Low Overhead Barriers *(Must slide under!)*
-  - 🪵 Rolling Logs with angular physics
-  - 🪨 Falling Rocks with warning ground telegraphs
-  - 💣 Bouncing Spiky Mines
-  - 🍄 Spring Bounce Pads *(Launches you into the stratosphere!)*
-- **Original Cartoon Enemies & Stomp Mechanic**:
-  - 🍄 **Spiky Shroom**: Grumpy patrol mushroom.
-  - 🦇 **Flutter Bat**: Swoops down in sinusoidal flight waves.
-  - 🪨 **Golem**: Armored charging brute.
-  - 🎈 **Spike Puffer**: Hovering spiked balloon enemy.
-  - *Mario-Style Stomping*: Fall on top of any enemy's head to squash them flat, bounce back up into the air, and score bonus points!
-- **Juicy Power-ups**:
-  - 🛡️ **Shield Bubble**: Absorbs hits with a glowing forcefield.
-  - 🧲 **Coin Magnet**: Pulls coins and gems from afar.
-  - ⚡ **Hyper Speed Boost**: Rocket speed that obliterates obstacles!
-  - 🪙 **Double Coins (2X)**: Doubles all coin pickups for 12s.
-  - ❤️ **Health Heart**: Restores 1 lost heart container.
-  - ⏱️ **Slow Motion**: Slows down the world by 50% for tight maneuvers.
-- **Dynamic Surprise Disasters**:
-  - 🔥 **Meteor Shower**: Meteors crash from the heavens with fiery blast craters!
-  - 🪨 **Giant Rolling Hazard**: Massive rolling boulder charges across the screen!
-  - ⚡ **Sudden Violent Storm**: Gale-force winds and downpours with gem showers!
-  - 🌌 **Cosmic Low Gravity Rift**: Hangtime jumps with twinkling star trails!
-  - 🌙 **Spooky Darkness**: Dark shroud with a warm lantern spotlight on Bobo!
-  - 🌈 **Coin Fever**: Golden showers of coins and gems raining down!
-- **100% Procedural Audio**:
-  - Authentic Web Audio API sound synthesis (jumps, double-jumps, slides, coin chimes, stomps, sirens, and comical slide trombones).
-  - Melodic chiptune cartoon music loop generated in real-time without audio files.
-- **Persistent Progression**:
-  - LocalStorage saves your high scores, best distance, total coins, unlocked heroes, and themes.
-  - No real-money purchases: everything is earned through gameplay!
+**OOPS! WORLD** is an original, fast-paced 2D endless survival cartoon adventure game built exclusively for the **5key gaming platform**. Take control of **Bobo**, an expressive, bouncy cartoon creature navigating an infinitely generated procedural world crammed with unexpected traps, wacky enemies, dynamic weather disasters, and supercharged power-ups!
 
 ---
 
-## 🕹️ Controls
+## 🌟 Highlights & Technical Innovations
 
-### Desktop
-| Action | Key |
-| --- | --- |
-| **Jump / Double-Jump** | `Space` or `Up Arrow` (`↑`) or `W` |
-| **Slide** | `Down Arrow` (`↓`) or `S` |
-| **Pause / Resume** | `Escape` or `P` |
+- **100% Procedural Vector Rendering**: Zero downloaded spritesheets, stock graphics, external images, or pre-rendered textures. Every character, background, particle, obstacle, and animated hazard is drawn entirely through mathematical code on HTML5 Canvas.
+- **Synthesized Procedural Audio Engine**: Real-time chiptune audio synthesized entirely with the native **Web Audio API**—featuring custom sound effects (jumps, double-jumps, slides, stomps, coin chimes, disaster sirens, and slide trombones) plus dynamic background music without external audio files.
+- **Asymmetrical Futuristic Controls**: Custom geometric neon control panels (**SLIDE** in electric cyan and **JUMP** in neon lime green) with layered depth, tactile compression, chevron pulse halos, and multi-touch support.
+- **Dual-Platform Architecture**: Run directly in any modern desktop or mobile browser, or build into a native, hardware-accelerated **Android APK** with immersive fullscreen mode and low-latency haptic vibration feedback.
+- **Automated CI/CD**: Seamless GitHub Actions workflow that compiles and publishes release-ready APKs automatically.
+
+---
+
+## 🎮 Gameplay & Features
+
+### 🗺️ Endless Procedural Biomes
+Run across rolling hills, floating platforms, and perilous gap pits across 4 dynamically shifting environments:
+1. 🌲 **Green Haven (Forest)**: Lush hills, shady pine groves, vibrant flora, and rolling terrain.
+2. 🏜️ **Sunken Dunes (Desert)**: Golden dunes, ancient pyramid silhouettes, and scorching sands.
+3. ❄️ **Frosty Tundra (Snow)**: Glistening snowbanks, falling flurries, and frosty ledges.
+4. 🌌 **Cosmic Nebula (Mystic)**: Luminescent crystal formations and starlit nebulae.
+
+### 🌤️ Dynamic Day/Night & Weather Cycles
+- Smooth celestial transitions between midday sun, golden sunsets, and star-filled night skies.
+- Dynamic weather shifts: **Clear Skies**, **Torrential Rain**, **Gentle Snow flurries**, and **Violent Storms** with screen-shaking lightning flashes.
+
+### 👥 Unlockable Cartoon Heroes
+Every hero has unique perks and expressive squash-and-stretch animations:
+- **Bobo**: The beloved bouncy hero with antenna wobble and panic expressions.
+- **Pip the Bunny**: Long floppy ears with extended slide duration.
+- **Kato the Ninja**: Agile feline shinobi with +10% higher jump velocity.
+- **Gloop the Alien**: Cosmic gelatin blob with an expanded coin magnet pull radius.
+- **Robo-9**: Titanium retro droid that starts every run with a complimentary energy shield.
+
+### ⚠️ Traps, Hazards & Stomp Mechanics
+- 🪨 **Boulders & Rocks**: Static and roll-over hazards.
+- 💥 **Spike Crystals**: Dangerous ground patches that must be leaped over.
+- ⚠️ **Low Overhead Barriers**: Dangerous hanging beams requiring a quick duck-and-slide.
+- 🪵 **Rolling Logs**: Dynamic obstacles rolling toward you with angular physics.
+- 🪨 **Falling Boulders**: Heavy rocks with ground telegraph warnings before impact.
+- 💣 **Bouncing Mines**: Hovering explosive mines that bob up and down.
+- 🍄 **Spring Bounce Pads**: Launches Bobo sky-high for extra hangtime and coin arcs!
+- 👾 **Enemy Stomping**: Drop directly onto enemy heads (Spiky Shrooms, Flutter Bats, Golems, Spike Puffers) to squash them flat, bounce upward, and earn bonus score!
+
+### ⚡ Power-Ups & Boosters
+- 🛡️ **Shield Bubble**: Absorbs an impact with an electric forcefield.
+- 🧲 **Coin Magnet**: Draws nearby coins and rare gems toward Bobo.
+- ⚡ **Hyper Speed**: Supercharged rocket velocity that smashes through obstacles!
+- 🪙 **Double Coins (2X)**: Multiplies all coin pickups for 12 seconds.
+- ❤️ **Health Heart**: Restores 1 lost heart container.
+- ⏱️ **Slow Motion**: Slows game speed by 50% for tight platforming maneuvers.
+
+### 🚨 Surprise Disasters
+Survive random high-stakes events that test your reflexes:
+- 🔥 **Meteor Shower**: Meteors rain from the sky, leaving blast craters.
+- 🪨 **Giant Rolling Hazard**: A colossal rolling boulder charges across the screen!
+- ⚡ **Sudden Storm**: Gale-force winds, downpours, and lightning strikes.
+- 🌌 **Cosmic Low-Gravity Rift**: Floaty moon physics with sparkling star trails.
+- 🌙 **Spooky Darkness**: A pitch-black shroud with a warm lantern spotlight on Bobo.
+- 🌈 **Coin Fever**: Golden showers of coins and gems raining across the stage!
+
+---
+
+## 🕹️ Controls Guide
+
+### Desktop (Keyboard)
+| Action | Key Bindings |
+| :--- | :--- |
+| **Jump / Double-Jump** | `Space` · `Up Arrow (↑)` · `W` |
+| **Slide (Duck)** | `Down Arrow (↓)` · `S` |
+| **Pause / Resume** | `Escape` · `P` |
 
 ### Mobile & Touchscreens
-- **Touch Buttons**: Large semi-transparent on-screen buttons:
-  - ⬇️ **SLIDE** (Bottom-Left)
-  - ⬆️ **JUMP** (Bottom-Right)
-- **Gestures**: Tap or swipe anywhere on the left half to slide, tap right half to jump!
-- **Haptic Vibration**: Native Android vibration feedback on impacts and pickups.
+- **Left Control Panel (Cyan)**: Hold to **SLIDE** under low obstacles.
+- **Right Control Panel (Lime Green)**: Tap to **JUMP** or double-tap in mid-air to **DOUBLE-JUMP**.
+- **Full Touch Support**: Tap or swipe anywhere on the left half to slide, or the right half to jump.
+- **Haptic Feedback**: Native vibration impulses on hits, stomps, power-up pickups, and jumps on supported Android devices.
 
+---
 
+## 📁 Repository Architecture
 
-## 📱 Android App Compilation
-
-This project includes an Android project that runs the game in full-screen landscape mode with hardware acceleration and native vibration support:
-```bash
-gradle :app:assembleDebug
+```text
+├── index.html                   # Responsive HTML5 entry point & geometric SVG controls
+├── styles.css                   # Mobile-first landscape styles, animations & HUD styling
+├── src/                         # Pure JavaScript Canvas Game Engine
+│   ├── main.js                  # Engine bootstrap & game loop initialization
+│   ├── game.js                  # Core Game controller, canvas scaling, state & events
+│   ├── player.js                # Bobo character physics, squash/stretch & animations
+│   ├── world.js                 # Procedural terrain generation, biomes & weather
+│   ├── obstacles.js             # Traps, physics objects & collision detection
+│   ├── enemies.js               # Cartoon enemy AI, flight paths & stomp squash logic
+│   ├── powerups.js              # Collectibles, power-up buffs & coin arc patterns
+│   ├── events.js                # Surprise disasters & dynamic weather anomalies
+│   ├── audio.js                 # 100% Web Audio API procedural synthesis & music
+│   ├── ui.js                    # In-game HUD, menus, shop, settings & toast alerts
+│   ├── storage.js               # Persistent local progress & high score management
+│   └── utils.js                 # Math, random generation & geometry utilities
+├── app/                         # Native Android Application (Kotlin / Jetpack Compose)
+│   ├── src/main/java/           # MainActivity, Compose screen & AndroidBridge
+│   ├── src/main/assets/         # Bundled offline game engine & assets
+│   ├── src/main/res/            # Android resources, adaptive icons & themes
+│   └── build.gradle.kts         # App-level build configuration
+├── .github/workflows/           # Automated CI/CD Pipelines
+│   └── android-release.yml      # Automated GitHub Actions APK build & release
+├── LICENSE                      # Official MIT License
+└── README.md                    # Project documentation & 5key platform guide
 ```
 
 ---
 
-## 🤖 Automated CI/CD: GitHub Actions & Releases
+## 🚀 Building & Running
 
-Whenever you push commits to the `main` branch, the `.github/workflows/android-release.yml` workflow automatically:
-1. Sets up JDK 21 and the Android build environment.
-2. Compiles a production-ready Android APK (`:app:assembleRelease`).
-3. Resolves the semantic version tag (e.g. `v1.0.0`, `v1.0.1`, avoiding duplicates).
-4. Publishes a new **GitHub Release** and attaches **ONLY** the signed `.apk` file (`OOPS-WORLD-v1.0.1.apk`) for public download.
+### 🌐 Web (Development & Play)
+Run the game using any local HTTP static server, or open `index.html` directly in your browser:
+```bash
+# Using python 3
+python3 -m http.server 8080
 
-### 🔐 Custom Signing Keystore (Optional)
+# Using Node.js npx serve
+npx serve .
+```
+Navigate to `http://localhost:8080` in your browser.
 
-The CI workflow is fully self-sufficient and works **out of the box** without setup. If you wish to sign your releases with your official Android upload key:
+### 📱 Android Build (Gradle)
+To compile the Android APK locally:
+```bash
+# Debug build (generates app-debug.apk)
+gradle :app:assembleDebug
 
-1. Export your `.jks` keystore to base64:
+# Run JVM Unit & Robolectric Tests
+gradle :app:testDebugUnitTest
+
+# Production release build
+gradle :app:assembleRelease
+```
+
+---
+
+## 🤖 Automated CI/CD & Releases
+
+The repository includes a production-ready GitHub Actions workflow (`.github/workflows/android-release.yml`):
+1. **Trigger**: Automatically executes on pushes to the `main` or `master` branch, or manually via `workflow_dispatch`.
+2. **Environment**: Configures JDK 21 and the Android build toolchain.
+3. **Compilation**: Builds the release APK (`:app:assembleRelease`).
+4. **Versioning**: Automatically calculates semantic versioning tags (e.g. `v1.0.1`).
+5. **Publishing**: Attaches **ONLY** the signed `OOPS-WORLD-v1.0.1.apk` to the GitHub Release.
+
+### 🔐 Custom Keystore Signing (Optional)
+If you wish to sign release APKs with your personal upload keystore:
+1. Encode your `.jks` keystore to Base64:
    ```bash
    base64 -w 0 my-upload-key.jks
    ```
-2. In your GitHub repository, go to **Settings** → **Secrets and variables** → **Actions**.
-3. Create the following repository secrets:
-   - `KEYSTORE_BASE64`: Base64 encoded content of your keystore file.
-   - `STORE_PASSWORD`: Password for your keystore.
-   - `KEY_PASSWORD`: Password for your key alias.
+2. In GitHub, go to **Settings** → **Secrets and variables** → **Actions**.
+3. Add the following repository secrets:
+   - `KEYSTORE_BASE64`: Base64 encoded string of your keystore file.
+   - `STORE_PASSWORD`: Keystore password.
+   - `KEY_PASSWORD`: Key alias password.
 
+---
+
+## 📄 License & Copyright
+
+**OOPS! WORLD** is open-source software released under the [MIT License](LICENSE).
+
+Copyright © 2026 **5key Gaming Platform**. All rights reserved.
