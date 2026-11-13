@@ -77,6 +77,12 @@ class UIManager {
       case 'menu':
         this.drawMainMenu(ctx);
         break;
+      case 'cinematic':
+        this.game.narration.draw(ctx);
+        break;
+      case 'disasters':
+        this.drawDisasterExpeditions(ctx);
+        break;
       case 'playing':
         this.drawHUD(ctx);
         this.drawTouchControls(ctx);
@@ -259,13 +265,17 @@ class UIManager {
     ctx.textAlign = 'center';
     ctx.fillText(`🏆 BEST: ${storage.highScore} pts  |  🪙 COINS: ${storage.totalCoins}`, w / 2, 270);
 
-    this.drawButton(ctx, 'play_btn', w / 2 - 110, 305, 220, 52, '▶ PLAY GAME', '#2ED573', '#FFFFFF', () => {
+    this.drawButton(ctx, 'play_btn', w / 2 - 110, 298, 220, 48, '▶ PLAY GAME', '#2ED573', '#FFFFFF', () => {
       this.game.startPlaying();
     });
 
+    this.drawButton(ctx, 'story_btn', w / 2 - 190, 354, 380, 42, '📜 THE GREAT DISASTER — STORY CARDS', '#00D2FF', '#001A33', () => {
+      this.game.state = 'disasters';
+    });
+
     const btnW = 105;
-    const btnH = 40;
-    const btnY = 375;
+    const btnH = 36;
+    const btnY = 406;
 
     this.drawButton(ctx, 'chars_btn', w / 2 - 225, btnY, btnW, btnH, '👥 HEROES', '#70A1FF', '#FFFFFF', () => {
       this.game.state = 'shop_chars';
@@ -281,6 +291,10 @@ class UIManager {
 
     this.drawButton(ctx, 'howto_btn', w / 2 + 120, btnY, btnW, btnH, '❓ GUIDE', '#9B59B6', '#FFFFFF', () => {
       this.game.state = 'howto';
+    });
+
+    this.drawButton(ctx, 'cinematic_replay_btn', w / 2 - 150, 452, 300, 34, '🎬 REPLAY OPENING CINEMATIC', 'rgba(255, 255, 255, 0.16)', '#E2E8F0', () => {
+      this.game.narration.startOpeningCinematic(false);
     });
   }
 
@@ -341,11 +355,15 @@ class UIManager {
       ctx.fillText('🎉 NEW HIGH SCORE! 🎉', w / 2, cardY + cardH + 28);
     }
 
-    this.drawButton(ctx, 'retry_btn', w / 2 - 120, 345, 240, 50, '🔄 PLAY AGAIN (Space)', '#2ED573', '#FFFFFF', () => {
+    this.drawButton(ctx, 'retry_btn', w / 2 - 130, 335, 260, 46, '🔄 PLAY AGAIN (Space)', '#2ED573', '#FFFFFF', () => {
       this.game.startPlaying();
     });
 
-    this.drawButton(ctx, 'menu_btn', w / 2 - 120, 405, 240, 42, '🏠 MAIN MENU', '#485460', '#FFFFFF', () => {
+    this.drawButton(ctx, 'story_cards_btn', w / 2 - 130, 388, 260, 40, '📜 STORY & DISASTER CARDS', '#00D2FF', '#001A33', () => {
+      this.game.state = 'disasters';
+    });
+
+    this.drawButton(ctx, 'menu_btn', w / 2 - 130, 436, 260, 38, '🏠 MAIN MENU', '#485460', '#FFFFFF', () => {
       this.game.state = 'menu';
     });
   }
@@ -602,6 +620,245 @@ class UIManager {
 
     this.drawButton(ctx, 'guide_back', w / 2 - 70, 375, 140, 42, '⬅ BACK', '#485460', '#FFF', () => {
       this.game.state = 'menu';
+    });
+  }
+
+  drawDisasterExpeditions(ctx) {
+    const w = this.game.width;
+    const h = this.game.height;
+    const story = this.game.storage.data.story || {};
+    const cards = story.disasterCards || {};
+    const SCRIPT = window.OopsWorld.SCRIPT_DATA || {};
+    const disasterMeta = SCRIPT.DISASTER_CARDS || [];
+
+    // Dark sleek background
+    ctx.fillStyle = 'rgba(10, 15, 29, 0.96)';
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle star dust particles in background
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.2)';
+    for (let i = 0; i < 20; i++) {
+      const sx = ((i * 137) % w);
+      const sy = ((i * 73) % h);
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Header
+    ctx.save();
+    ctx.font = '900 23px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#00F0FF';
+    ctx.fillText('OOPS! WORLD — THE GREAT DISASTER', w / 2, 26);
+
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = '#A4B0BE';
+    ctx.fillText('Survive all 6 forces of destruction to rescue Bobo’s friends and unlock Part 2: The Hidden Truth', w / 2, 44);
+    ctx.restore();
+
+    let completedCount = 0;
+    const cardW = 280;
+    const cardH = 152;
+
+    disasterMeta.forEach((meta, idx) => {
+      const col = idx % 3;
+      const row = Math.floor(idx / 3);
+      const cx = 32 + col * 308;
+      const cy = 56 + row * 162;
+      const cardData = cards[meta.id] || { progress: 0, target: 100, completed: false };
+      const isDone = cardData.completed || cardData.progress >= cardData.target;
+      if (isDone) completedCount++;
+
+      // Card Background
+      ctx.save();
+      ctx.fillStyle = isDone ? 'rgba(18, 38, 48, 0.92)' : 'rgba(16, 24, 40, 0.88)';
+      this.roundRect(ctx, cx, cy, cardW, cardH, 12);
+      ctx.fill();
+
+      ctx.strokeStyle = isDone ? '#2ED573' : meta.color;
+      ctx.lineWidth = isDone ? 2 : 1.2;
+      this.roundRect(ctx, cx, cy, cardW, cardH, 12);
+      ctx.stroke();
+
+      // Card Header
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillStyle = meta.color;
+      ctx.textAlign = 'left';
+      ctx.fillText(`${meta.icon} ${meta.title}`, cx + 12, cy + 22);
+
+      // Status Badge
+      const badgeText = isDone ? '✓ RESCUED' : 'IN PROGRESS';
+      const badgeW = isDone ? 84 : 92;
+      const badgeH = 20;
+      const badgeX = cx + cardW - badgeW - 10;
+      const badgeY = cy + 8;
+      ctx.fillStyle = isDone ? '#2ED573' : 'rgba(255, 165, 2, 0.2)';
+      this.roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 6);
+      ctx.fill();
+      ctx.strokeStyle = isDone ? '#2ED573' : '#FFA502';
+      ctx.lineWidth = 1;
+      this.roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 6);
+      ctx.stroke();
+
+      ctx.fillStyle = isDone ? '#0B2013' : '#FFA502';
+      ctx.font = '900 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 14);
+
+      // Subtitle / Hazard Description
+      ctx.fillStyle = '#CED6E0';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(meta.subtitle, cx + 12, cy + 42);
+
+      ctx.fillStyle = '#747D8C';
+      ctx.font = '10px sans-serif';
+      const shortDesc = meta.description.length > 52 ? meta.description.substring(0, 50) + '...' : meta.description;
+      ctx.fillText(shortDesc, cx + 12, cy + 58);
+
+      // Rescued Friend Line
+      ctx.fillStyle = isDone ? '#7BED9F' : '#FFA502';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`Friend: ${meta.friendName} ${isDone ? '★ SAFE!' : '⏳ Needs rescue'}`, cx + 12, cy + 78);
+
+      // Target text
+      let targetUnit = 'units';
+      if (meta.targetDistance) targetUnit = 'meters survived';
+      else if (meta.targetJumps) targetUnit = 'hazard jumps';
+      else if (meta.targetStorms) targetUnit = 'storm survived';
+      else if (meta.targetCoins) targetUnit = 'energy coins';
+      else if (meta.targetStomps) targetUnit = 'creatures stomped';
+      else if (meta.targetMeteors) targetUnit = 'meteor strike';
+
+      ctx.fillStyle = '#A4B0BE';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(`Target: ${cardData.target} ${targetUnit}`, cx + 12, cy + 96);
+
+      // Progress bar
+      const barX = cx + 12;
+      const barY = cy + 104;
+      const barW = cardW - 24;
+      const barH = 12;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      this.roundRect(ctx, barX, barY, barW, barH, 5);
+      ctx.fill();
+
+      const fillRatio = Math.max(0, Math.min(1, cardData.progress / cardData.target));
+      if (fillRatio > 0) {
+        ctx.fillStyle = isDone ? '#2ED573' : meta.color;
+        this.roundRect(ctx, barX, barY, Math.max(8, barW * fillRatio), barH, 5);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.floor(cardData.progress)} / ${cardData.target}`, barX + barW / 2, barY + 9);
+
+      // Motivational Tip
+      ctx.fillStyle = isDone ? '#2ED573' : '#70A1FF';
+      ctx.font = 'italic 10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(isDone ? '✨ Force overcome! Friend returned to camp.' : '⚡ Keep running to conquer this zone!', cx + 12, cy + 134);
+
+      ctx.restore();
+    });
+
+    // Card 7 Banner
+    const isPart2Unlocked = story.part2TrailerUnlocked || (completedCount >= 6);
+    const c7X = 32;
+    const c7Y = 388;
+    const c7W = 896;
+    const c7H = 148;
+
+    ctx.save();
+    if (isPart2Unlocked) {
+      // Unlocked
+      ctx.fillStyle = 'rgba(25, 15, 45, 0.94)';
+      this.roundRect(ctx, c7X, c7Y, c7W, c7H, 14);
+      ctx.fill();
+
+      ctx.strokeStyle = '#E056FD';
+      ctx.lineWidth = 2.2;
+      this.roundRect(ctx, c7X, c7Y, c7W, c7H, 14);
+      ctx.stroke();
+
+      ctx.font = '900 17px sans-serif';
+      ctx.fillStyle = '#FFD700';
+      ctx.textAlign = 'left';
+      ctx.fillText('🌟 SEVENTH CARD: PART 2 — THE HIDDEN TRUTH (UNLOCKED)', c7X + 20, c7Y + 28);
+
+      ctx.font = '13px sans-serif';
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fillText('Against all odds, Bobo survived all six disasters and reunited with his friends!', c7X + 20, c7Y + 52);
+
+      ctx.fillStyle = '#A4B0BE';
+      ctx.font = 'italic 12px sans-serif';
+      ctx.fillText('“Some mysteries are better left undiscovered... but some secrets refuse to stay hidden.”', c7X + 20, c7Y + 74);
+
+      this.drawButton(ctx, 'play_trailer_btn', c7X + 20, c7Y + 92, 260, 42, '▶ PLAY PART 2 TRAILER', '#E056FD', '#FFFFFF', () => {
+        this.game.narration.startPart2Trailer();
+      });
+
+      this.drawButton(ctx, 'play_conclusion_btn', c7X + 300, c7Y + 92, 260, 42, '🏆 REPLAY PART 1 CONCLUSION', '#FFA502', '#FFFFFF', () => {
+        this.game.narration.startPart1Conclusion();
+      });
+    } else {
+      // Locked
+      ctx.fillStyle = 'rgba(15, 18, 30, 0.88)';
+      this.roundRect(ctx, c7X, c7Y, c7W, c7H, 14);
+      ctx.fill();
+
+      ctx.strokeStyle = '#485460';
+      ctx.lineWidth = 1.5;
+      this.roundRect(ctx, c7X, c7Y, c7W, c7H, 14);
+      ctx.stroke();
+
+      ctx.font = '900 16px sans-serif';
+      ctx.fillStyle = '#747D8C';
+      ctx.textAlign = 'left';
+      ctx.fillText('🔒 SEVENTH CARD: PART 2 — THE HIDDEN TRUTH (LOCKED)', c7X + 20, c7Y + 30);
+
+      ctx.font = '13px sans-serif';
+      ctx.fillStyle = '#A4B0BE';
+      ctx.fillText(`Rescue Bobo’s friends by completing all 6 disaster cards above (${completedCount}/6 finished).`, c7X + 20, c7Y + 56);
+
+      ctx.fillStyle = '#57606F';
+      ctx.font = 'italic 12px sans-serif';
+      ctx.fillText('Once all 6 zones are conquered, the Part 1 Conclusion and Part 2 Cinematic Trailer will unlock here!', c7X + 20, c7Y + 78);
+
+      // Lock Badge
+      ctx.fillStyle = 'rgba(255, 71, 87, 0.15)';
+      this.roundRect(ctx, c7X + c7W - 220, c7Y + 38, 200, 64, 10);
+      ctx.fill();
+      ctx.strokeStyle = '#FF4757';
+      ctx.lineWidth = 1;
+      this.roundRect(ctx, c7X + c7W - 220, c7Y + 38, 200, 64, 10);
+      ctx.stroke();
+
+      ctx.fillStyle = '#FF4757';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`🔒 ${6 - completedCount} MORE TO UNLOCK`, c7X + c7W - 120, c7Y + 65);
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(`${completedCount} of 6 Completed`, c7X + c7W - 120, c7Y + 84);
+    }
+    ctx.restore();
+
+    // Bottom Navigation Bar
+    const bY = 550;
+    this.drawButton(ctx, 'story_back_btn', 32, bY, 150, 44, '◀ MAIN MENU', '#485460', '#FFFFFF', () => {
+      this.game.state = 'menu';
+    });
+
+    this.drawButton(ctx, 'story_cinematic_btn', 200, bY, 320, 44, '🎬 REPLAY OPENING CINEMATIC (1–7)', '#00D2FF', '#001A33', () => {
+      this.game.narration.startOpeningCinematic(false);
+    });
+
+    this.drawButton(ctx, 'story_run_btn', 540, bY, 200, 44, '▶ START EXPEDITION', '#2ED573', '#FFFFFF', () => {
+      this.game.startPlaying();
     });
   }
 

@@ -20,7 +20,8 @@ class Game {
       EnemyManager,
       PowerupManager,
       SurpriseEventManager,
-      UIManager
+      UIManager,
+      NarrationManager
     } = window.OopsWorld;
 
     this.storage = new StorageManager();
@@ -35,8 +36,15 @@ class Game {
     this.powerups = new PowerupManager(this);
     this.events = new SurpriseEventManager(this);
     this.ui = new UIManager(this);
+    this.narration = new NarrationManager(this);
 
-    this.state = 'menu';
+    // First launch cinematic check
+    if (!this.storage.data.story || !this.storage.data.story.openingCinematicWatched) {
+      this.state = 'cinematic';
+      this.narration.startOpeningCinematic(true);
+    } else {
+      this.state = 'menu';
+    }
     this.score = 0;
     this.coinsCollected = 0;
     this.enemiesStomped = 0;
@@ -337,6 +345,15 @@ class Game {
   }
 
   handleKeyDown(code) {
+    if (this.state === 'cinematic') {
+      if (code === 'Space' || code === 'Enter' || code === 'ArrowRight') {
+        this.narration.nextScene();
+      } else if (code === 'Escape') {
+        this.narration.skipCinematic();
+      }
+      return;
+    }
+
     if (code === 'Escape' || code === 'KeyP') {
       if (this.state === 'playing' || this.state === 'paused') {
         this.togglePause();
@@ -371,6 +388,11 @@ class Game {
 
   handlePointerDown(x, y, id) {
     if (this.ui.handleClick(x, y)) {
+      return;
+    }
+
+    if (this.state === 'cinematic') {
+      this.narration.nextScene();
       return;
     }
 
@@ -453,6 +475,9 @@ class Game {
     this.state = 'gameover';
     this.audio.playGameOver();
 
+    // Update geophysical distance progress
+    this.storage.updateDisasterProgress('geophysical', Math.floor(this.world.distance), true);
+
     const res = this.storage.recordRun({
       score: this.score,
       distance: this.world.distance,
@@ -462,6 +487,15 @@ class Game {
     });
 
     this.isNewHigh = res.isNewHigh;
+
+    // When all 6 disasters are completed, automatically trigger Part 1 Conclusion
+    if (this.storage.allDisastersCompleted() && !this.storage.data.story?.part1ConclusionWatched) {
+      setTimeout(() => {
+        if (this.state === 'gameover') {
+          this.narration.startPart1Conclusion();
+        }
+      }, 1600);
+    }
   }
 
   start() {
@@ -487,6 +521,13 @@ class Game {
     if (this.isOrientationBlocked) return;
 
     this.updateMobileControlsVisibility();
+
+    if (this.state === 'cinematic') {
+      this.narration.update(dt);
+      this.ui.update(dt);
+      return;
+    }
+
     this.camera.update(dt);
     this.ui.update(dt);
 
@@ -501,7 +542,7 @@ class Game {
       this.powerups.update(dt, worldSpeed);
       this.events.update(dt, worldSpeed);
       this.particles.update(dt);
-    } else if (this.state === 'gameover' || this.state === 'menu') {
+    } else if (this.state === 'gameover' || this.state === 'menu' || this.state === 'disasters') {
       this.particles.update(dt);
     }
   }
@@ -519,6 +560,12 @@ class Game {
   render() {
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.width, this.height);
+
+    if (this.state === 'cinematic') {
+      this.ctx.restore();
+      this.ui.draw(this.ctx);
+      return;
+    }
 
     this.camera.apply(this.ctx);
 

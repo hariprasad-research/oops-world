@@ -202,6 +202,14 @@ class SurpriseEventManager {
     this.game.hudToast('🎉 DISASTER SURVIVED! +350 PTS', '#2ED573', 2.5);
     this.game.audio.playPowerup();
 
+    if (this.currentEvent === EVENT_TYPES.SUDDEN_STORM) {
+      this.game.storage?.updateDisasterProgress('meteorological', 1);
+    } else if (this.currentEvent === EVENT_TYPES.METEOR_SHOWER || this.currentEvent === EVENT_TYPES.LOW_GRAVITY) {
+      this.game.storage?.updateDisasterProgress('extraterrestrial', 1);
+    } else if (this.currentEvent === EVENT_TYPES.GIANT_BOULDER) {
+      this.game.storage?.updateDisasterProgress('geophysical', 50);
+    }
+
     const Utils = window.OopsWorld.Utils;
     this.nextEventDistance = this.game.world.distance + Utils.randFloat(160, 240);
     this.entities = [];

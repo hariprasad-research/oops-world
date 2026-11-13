@@ -82,6 +82,7 @@ class Collectible {
         const multiplier = player.powerups.doubleCoinsTimer > 0 ? 2 : 1;
         this.game.coinsCollected += 1 * multiplier;
         this.game.score += 25 * multiplier;
+        this.game.storage?.updateDisasterProgress('climatological', 1 * multiplier);
         this.game.particles.coinSparkle(this.x, this.y);
         this.game.audio.playCoin();
         break;
@@ -90,6 +91,7 @@ class Collectible {
         const multiplier = player.powerups.doubleCoinsTimer > 0 ? 2 : 1;
         this.game.coinsCollected += 5 * multiplier;
         this.game.score += 150 * multiplier;
+        this.game.storage?.updateDisasterProgress('climatological', 3 * multiplier);
         this.game.particles.burst(this.x, this.y, 14, {
           color: '#FF3366',
           shape: 'star',

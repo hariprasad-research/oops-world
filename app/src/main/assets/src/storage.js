@@ -135,6 +135,19 @@ class StorageManager {
         totalCoinsEarned: 0,
         enemiesStomped: 0,
         disastersSurvived: 0
+      },
+      story: {
+        openingCinematicWatched: false,
+        part1ConclusionWatched: false,
+        part2TrailerUnlocked: false,
+        disasterCards: {
+          geophysical: { completed: false, progress: 0, target: 250 },
+          hydrological: { completed: false, progress: 0, target: 25 },
+          meteorological: { completed: false, progress: 0, target: 1 },
+          climatological: { completed: false, progress: 0, target: 40 },
+          biological: { completed: false, progress: 0, target: 6 },
+          extraterrestrial: { completed: false, progress: 0, target: 1 }
+        }
       }
     };
   }
@@ -149,7 +162,15 @@ class StorageManager {
           ...this.getDefaults(),
           ...parsed,
           settings: { ...this.getDefaults().settings, ...(parsed.settings || {}) },
-          stats: { ...this.getDefaults().stats, ...(parsed.stats || {}) }
+          stats: { ...this.getDefaults().stats, ...(parsed.stats || {}) },
+          story: {
+            ...this.getDefaults().story,
+            ...(parsed.story || {}),
+            disasterCards: {
+              ...this.getDefaults().story.disasterCards,
+              ...((parsed.story && parsed.story.disasterCards) || {})
+            }
+          }
         };
       }
     } catch (err) {
@@ -238,6 +259,54 @@ class StorageManager {
   updateSettings(newSettings) {
     this.memoryData.settings = { ...this.memoryData.settings, ...newSettings };
     this.save();
+  }
+
+  markOpeningWatched() {
+    if (!this.memoryData.story) this.memoryData.story = this.getDefaults().story;
+    this.memoryData.story.openingCinematicWatched = true;
+    this.save();
+  }
+
+  markPart1ConclusionWatched() {
+    if (!this.memoryData.story) this.memoryData.story = this.getDefaults().story;
+    this.memoryData.story.part1ConclusionWatched = true;
+    this.memoryData.story.part2TrailerUnlocked = true;
+    this.save();
+  }
+
+  unlockPart2Trailer() {
+    if (!this.memoryData.story) this.memoryData.story = this.getDefaults().story;
+    this.memoryData.story.part2TrailerUnlocked = true;
+    this.save();
+  }
+
+  updateDisasterProgress(type, amount, isAbsolute = false) {
+    if (!this.memoryData.story || !this.memoryData.story.disasterCards) {
+      this.memoryData.story = this.getDefaults().story;
+    }
+    const card = this.memoryData.story.disasterCards[type];
+    if (!card || card.completed) return false;
+
+    if (isAbsolute) {
+      card.progress = Math.max(card.progress, amount);
+    } else {
+      card.progress += amount;
+    }
+
+    if (card.progress >= card.target) {
+      card.completed = true;
+      card.progress = card.target;
+      this.save();
+      return true; // Newly completed
+    }
+    this.save();
+    return false;
+  }
+
+  allDisastersCompleted() {
+    if (!this.memoryData.story || !this.memoryData.story.disasterCards) return false;
+    const cards = this.memoryData.story.disasterCards;
+    return Object.values(cards).every((c) => c.completed);
   }
 }
 

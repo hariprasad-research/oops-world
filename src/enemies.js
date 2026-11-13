@@ -119,6 +119,7 @@ class Enemy {
 
       this.game.score += 150;
       this.game.enemiesStomped += 1;
+      this.game.storage?.updateDisasterProgress('biological', 1);
       this.game.particles.burst(this.x, this.y - this.height / 2, 14, {
         color: '#FFD700',
         shape: 'star',

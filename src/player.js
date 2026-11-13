@@ -129,6 +129,8 @@ class Player {
       this.scaleX = 0.75;
       this.scaleY = 1.35;
 
+      this.game.storage?.updateDisasterProgress('hydrological', 1);
+
       this.game.particles.dustPuff(this.x, this.y, 6);
       this.game.audio.playJump();
       return true;
@@ -138,6 +140,8 @@ class Player {
       this.hasDoubleJumped = true;
       this.state = PLAYER_STATES.DOUBLE_JUMPING;
       this.spinRotation = 0;
+
+      this.game.storage?.updateDisasterProgress('hydrological', 1);
 
       this.game.particles.burst(this.x, this.y - 20, 10, {
         color: '#00F0FF',
