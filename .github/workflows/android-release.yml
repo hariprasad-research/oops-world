@@ -1,3 +1,4 @@
+
 name: Build & Release Android APK
 
 on:
@@ -17,54 +18,59 @@ jobs:
 
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
+          gradle-version: current
           cache-read-only: false
 
       - name: Ensure Environment Configuration
-        run: |
-          touch .env
+        run: touch .env
 
       - name: Configure Release Signing Credentials
-        id: signing_config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "::notice::Using custom release signing credentials from GitHub Secrets."
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "${{ github.workspace }}/my-upload-key.jks"
-            echo "KEYSTORE_PATH=${{ github.workspace }}/my-upload-key.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
-          else
-            echo "::notice::KEYSTORE_BASE64 secret not found. Generating a dedicated CI release signing keystore."
-            keytool -genkeypair -v \
-              -keystore "${{ github.workspace }}/my-upload-key.jks" \
-              -alias upload \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass "android_release_pass" \
-              -keypass "android_release_pass" \
-              -dname "CN=OOPS WORLD, OU=Games, O=5key, L=City, ST=State, C=US"
-            echo "KEYSTORE_PATH=${{ github.workspace }}/my-upload-key.jks" >> $GITHUB_ENV
-            echo "STORE_PASSWORD=android_release_pass" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=android_release_pass" >> $GITHUB_ENV
+          if [ -z "$KEYSTORE_BASE64" ] || \
+             [ -z "$STORE_PASSWORD" ] || \
+             [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are missing."
+            echo "Configure KEYSTORE_BASE64, STORE_PASSWORD and KEY_PASSWORD."
+            exit 1
           fi
+
+          KEYSTORE_PATH="${{ github.workspace }}/my-upload-key.jks"
+
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "::error::Keystore file is empty or invalid."
+            exit 1
+          fi
+
+          echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+
+          echo "::notice::Persistent release signing keystore configured."
 
       - name: Determine Semantic Release Tag
         id: semver
         run: |
           RAW_VERSION=$(grep -E 'versionName\s*=\s*' app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+
           if [ -z "$RAW_VERSION" ]; then
             RAW_VERSION="1.0.0"
           fi
@@ -80,24 +86,30 @@ jobs:
           TARGET_TAG="v${SEM_VERSION}"
 
           git fetch --tags --force 2>/dev/null || true
-          if git rev-parse "$TARGET_TAG" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/$TARGET_TAG" | grep -q "$TARGET_TAG"; then
+
+          if git rev-parse "$TARGET_TAG" >/dev/null 2>&1 || \
+             git ls-remote --tags origin "refs/tags/$TARGET_TAG" | grep -q "$TARGET_TAG"; then
+
             echo "Tag $TARGET_TAG already exists. Incrementing patch version..."
+
             MAJOR_MINOR=$(echo "$SEM_VERSION" | cut -d'.' -f1,2)
             CURRENT_PATCH=$(echo "$SEM_VERSION" | cut -d'.' -f3)
             MAX_PATCH=$((CURRENT_PATCH + 1))
 
             for existing_tag in $(git tag -l "v${MAJOR_MINOR}.*"); do
               TAG_PATCH=$(echo "$existing_tag" | sed -E "s/^v${MAJOR_MINOR}\.//" | grep -E '^[0-9]+$' || true)
+
               if [ -n "$TAG_PATCH" ] && [ "$TAG_PATCH" -ge "$MAX_PATCH" ]; then
                 MAX_PATCH=$((TAG_PATCH + 1))
               fi
             done
+
             TARGET_TAG="v${MAJOR_MINOR}.${MAX_PATCH}"
           fi
 
           echo "Final Semantic Version Tag: $TARGET_TAG"
-          echo "RELEASE_TAG=$TARGET_TAG" >> $GITHUB_ENV
-          echo "VERSION_NAME=$SEM_VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$TARGET_TAG" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$SEM_VERSION" >> "$GITHUB_ENV"
 
       - name: Build Release APK
         run: |
@@ -112,25 +124,28 @@ jobs:
         id: prepare_asset
         run: |
           BUILT_APK=$(find app/build/outputs/apk/release -name "*.apk" -type f | head -n 1)
+
           if [ -z "$BUILT_APK" ] || [ ! -f "$BUILT_APK" ]; then
-            echo "::error::Release APK not found in app/build/outputs/apk/release!"
+            echo "::error::Release APK not found!"
             exit 1
           fi
 
-          OUTPUT_APK="OOPS-WORLD-${{ env.RELEASE_TAG }}.apk"
+          OUTPUT_APK="OOPS-WORLD-${RELEASE_TAG}.apk"
+
           cp "$BUILT_APK" "$OUTPUT_APK"
+
           SHA256=$(sha256sum "$OUTPUT_APK" | cut -d' ' -f1)
           FILE_SIZE=$(du -h "$OUTPUT_APK" | cut -f1)
 
-          echo "APK_PATH=$OUTPUT_APK" >> $GITHUB_ENV
-          echo "APK_FILENAME=$OUTPUT_APK" >> $GITHUB_ENV
-          echo "APK_SHA256=$SHA256" >> $GITHUB_ENV
-          echo "APK_SIZE=$FILE_SIZE" >> $GITHUB_ENV
+          echo "APK_PATH=$OUTPUT_APK" >> "$GITHUB_ENV"
+          echo "APK_FILENAME=$OUTPUT_APK" >> "$GITHUB_ENV"
+          echo "APK_SHA256=$SHA256" >> "$GITHUB_ENV"
+          echo "APK_SIZE=$FILE_SIZE" >> "$GITHUB_ENV"
 
           echo "Successfully prepared: $OUTPUT_APK ($FILE_SIZE)"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: OOPS! WORLD ${{ env.RELEASE_TAG }} – Android Release
@@ -139,14 +154,14 @@ jobs:
           make_latest: true
           generate_release_notes: false
           body: |
-            Official Android release build of OOPS! WORLD — 2D endless cartoon survival game!
+            Official Android release build of OOPS! WORLD.
 
             Release Asset:
-            - Download File: ${{ env.APK_FILENAME }}
+            - Download: ${{ env.APK_FILENAME }}
             - File Size: ${{ env.APK_SIZE }}
-            - SHA-256 Checksum: ${{ env.APK_SHA256 }}
+            - SHA-256: ${{ env.APK_SHA256 }}
 
-            Installation Instructions:
+            Installation:
             1. Download the APK.
             2. Open the downloaded APK.
             3. Install the application.
@@ -159,25 +174,22 @@ jobs:
         if: always()
         run: |
           if [ "${{ job.status }}" = "success" ]; then
-            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+            cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
           ### 🚀 Android Release Published Successfully!
 
           | Item | Detail |
           | --- | --- |
-          | **Release Tag** | `${{ env.RELEASE_TAG }}` |
-          | **Package** | `${{ env.APK_FILENAME }}` |
-          | **File Size** | `${{ env.APK_SIZE }}` |
-          | **SHA-256** | `${{ env.APK_SHA256 }}` |
-          | **Commit** | `${{ github.sha }}` |
+          | Release Tag | `${{ env.RELEASE_TAG }}` |
+          | Package | `${{ env.APK_FILENAME }}` |
+          | File Size | `${{ env.APK_SIZE }}` |
+          | SHA-256 | `${{ env.APK_SHA256 }}` |
+          | Commit | `${{ github.sha }}` |
 
-          The release APK has been attached to the GitHub Release.
+          The release APK has been attached to GitHub Releases.
           EOF
           else
-            cat << 'EOF' >> $GITHUB_STEP_SUMMARY
-          ### ❌ Build & Release Failed
-
-          The Android APK build or release process encountered an error. Please inspect the workflow logs above for details.
-          EOF
+            echo "### ❌ Build & Release Failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "Please inspect the workflow logs." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Clean up Keystore
