@@ -141,7 +141,7 @@ fun GameWebViewScreen(activity: ComponentActivity) {
 
   BackHandler {
     webViewRef?.evaluateJavascript(
-      "if (window.oopsGame) { if (window.oopsGame.state === 'playing') { window.oopsGame.togglePause(); } else if (window.oopsGame.state === 'paused' || window.oopsGame.state === 'shop_chars' || window.oopsGame.state === 'shop_themes' || window.oopsGame.state === 'settings' || window.oopsGame.state === 'howto') { window.oopsGame.state = 'menu'; } }",
+      "if (window.oopsGame && window.oopsGame.handleBackPress) { window.oopsGame.handleBackPress(); }",
       null
     )
   }

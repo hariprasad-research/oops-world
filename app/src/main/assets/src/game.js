@@ -20,6 +20,7 @@ class Game {
       EnemyManager,
       PowerupManager,
       SurpriseEventManager,
+      ChapterDirector,
       UIManager,
       NarrationManager
     } = window.OopsWorld;
@@ -28,6 +29,9 @@ class Game {
     this.audio = new SoundEngine(this.storage);
     this.camera = new Camera();
     this.particles = new ParticleSystem(400);
+
+    this.activeChapter = null;
+    this.chapters = new ChapterDirector(this);
 
     this.world = new World(this);
     this.player = new Player(this);
@@ -45,6 +49,8 @@ class Game {
     } else {
       this.state = 'menu';
     }
+    this.prevState = this.state;
+
     this.score = 0;
     this.coinsCollected = 0;
     this.enemiesStomped = 0;
@@ -357,6 +363,8 @@ class Game {
     if (code === 'Escape' || code === 'KeyP') {
       if (this.state === 'playing' || this.state === 'paused') {
         this.togglePause();
+      } else {
+        this.handleBackPress();
       }
       return;
     }
@@ -369,11 +377,15 @@ class Game {
       }
     } else if (this.state === 'gameover') {
       if (code === 'Space' || code === 'Enter') {
-        this.startPlaying();
+        this.retryCurrentMode();
+      }
+    } else if (this.state === 'chapter_intro') {
+      if (code === 'Space' || code === 'Enter') {
+        this.beginActiveChapterGameplay();
       }
     } else if (this.state === 'menu') {
       if (code === 'Space' || code === 'Enter') {
-        this.startPlaying();
+        this.state = 'disasters';
       }
     }
   }
@@ -423,7 +435,7 @@ class Game {
         this.player.jump();
       }
     } else if (this.state === 'gameover') {
-      this.startPlaying();
+      this.retryCurrentMode();
     }
   }
 
@@ -439,8 +451,84 @@ class Game {
     this.ui.showToast(text, color, duration);
   }
 
-  startPlaying() {
+  startChapter(chapterId) {
+    const meta = this.chapters.getCardMeta(chapterId);
+    if (!meta || !meta.playableInPhase1) {
+      this.hudToast('🔒 Available in Phase 2!', '#FFA502', 2.4);
+      return false;
+    }
+    if (!this.storage.isChapterUnlocked(chapterId)) {
+      this.hudToast('🔒 Clear the previous Disaster Chapter first!', '#FF4757', 2.4);
+      return false;
+    }
+    this.chapters.startIntro(chapterId);
+    return true;
+  }
+
+  continueCampaign() {
+    const lastId = this.storage.data.story?.lastChapterId;
+    const highest = this.storage.getHighestPlayableChapter();
+    const targetId =
+      lastId &&
+      this.chapters.getCardMeta(lastId)?.playableInPhase1 &&
+      this.storage.isChapterUnlocked(lastId) &&
+      !this.storage.isChapterCompleted(lastId)
+        ? lastId
+        : highest;
+    return this.startChapter(targetId);
+  }
+
+  beginActiveChapterGameplay() {
+    if (!this.activeChapter) {
+      this.startEndless();
+      return;
+    }
     this.requestLandscapeAndFullscreen();
+    this.chapters.reset(this.activeChapter.id);
+    this.state = 'playing';
+    this.score = 0;
+    this.coinsCollected = 0;
+    this.enemiesStomped = 0;
+    this.disastersSurvived = 0;
+    this.isNewHigh = false;
+
+    this.particles.clear();
+    this.world.reset();
+    this.player.reset();
+    this.obstacles.reset();
+    this.enemies.reset();
+    this.powerups.reset();
+    this.events.reset();
+
+    this.audio.playPowerup();
+    if (this.storage.data.settings.musicEnabled) {
+      this.audio.startMusic();
+    }
+  }
+
+  retryCurrentMode() {
+    if (this.activeChapter) {
+      this.beginActiveChapterGameplay();
+    } else {
+      this.startEndless();
+    }
+  }
+
+  startEndless() {
+    this.activeChapter = null;
+    this.chapters.activeChapter = null;
+    this.startPlaying(true);
+  }
+
+  startPlaying(forceEndless = false) {
+    if (!forceEndless && this.activeChapter) {
+      this.beginActiveChapterGameplay();
+      return;
+    }
+
+    this.requestLandscapeAndFullscreen();
+    this.activeChapter = null;
+    this.chapters.activeChapter = null;
 
     this.state = 'playing';
     this.score = 0;
@@ -463,6 +551,45 @@ class Game {
     }
   }
 
+  selectHero(charId) {
+    const chars = window.OopsWorld.CHARACTERS || [];
+    const target = chars.find((c) => c.id === charId);
+    if (!target) return null;
+    if (!this.storage.isCharacterUnlocked(target.id)) return null;
+    this.storage.selectCharacter(target.id);
+    this.player.applyCharacterTraits(false);
+    return target;
+  }
+
+  cycleHero() {
+    const chars = (window.OopsWorld.CHARACTERS || []).filter((c) =>
+      this.storage.isCharacterUnlocked(c.id)
+    );
+    if (!chars.length) return null;
+    const curId = this.storage.data.selectedCharacter || 'bobo';
+    const curIdx = chars.findIndex((c) => c.id === curId);
+    const next = chars[(curIdx + 1) % chars.length];
+    return this.selectHero(next.id);
+  }
+
+  selectTheme(themeId) {
+    const themes = window.OopsWorld.THEMES || [];
+    const target = themes.find((t) => t.id === themeId);
+    if (!target) return null;
+    this.storage.selectTheme(target.id);
+    this.world.theme = target;
+    return target;
+  }
+
+  cycleTheme() {
+    const themes = window.OopsWorld.THEMES || [];
+    if (!themes.length) return null;
+    const curId = this.storage.data.selectedTheme || 'forest';
+    const curIdx = themes.findIndex((t) => t.id === curId);
+    const next = themes[(curIdx + 1) % themes.length];
+    return this.selectTheme(next.id);
+  }
+
   togglePause() {
     if (this.state === 'playing') {
       this.state = 'paused';
@@ -471,31 +598,40 @@ class Game {
     }
   }
 
+  handleBackPress() {
+    if (this.state === 'cinematic') {
+      this.narration.skipCinematic();
+    } else if (this.state === 'playing') {
+      this.togglePause();
+    } else if (this.state === 'paused' || this.state === 'gameover') {
+      this.audio.stopMusic();
+      this.state = this.activeChapter ? 'disasters' : 'menu';
+    } else if (this.state === 'chapter_intro' || this.state === 'chapter_rescue') {
+      this.state = 'disasters';
+    } else if (
+      ['disasters', 'upgrades', 'friends_collection', 'settings', 'howto'].includes(
+        this.state
+      )
+    ) {
+      this.state = 'menu';
+    }
+  }
+
   onPlayerDied() {
     this.state = 'gameover';
+    this.audio.stopMusic();
     this.audio.playGameOver();
-
-    // Update geophysical distance progress
-    this.storage.updateDisasterProgress('geophysical', Math.floor(this.world.distance), true);
 
     const res = this.storage.recordRun({
       score: this.score,
       distance: this.world.distance,
       coins: this.coinsCollected,
       enemiesStomped: this.enemiesStomped,
-      disastersSurvived: this.disastersSurvived
+      disastersSurvived: this.disastersSurvived,
+      chapterId: this.activeChapter ? this.activeChapter.id : null
     });
 
     this.isNewHigh = res.isNewHigh;
-
-    // When all 6 disasters are completed, automatically trigger Part 1 Conclusion
-    if (this.storage.allDisastersCompleted() && !this.storage.data.story?.part1ConclusionWatched) {
-      setTimeout(() => {
-        if (this.state === 'gameover') {
-          this.narration.startPart1Conclusion();
-        }
-      }, 1600);
-    }
   }
 
   start() {
@@ -520,6 +656,11 @@ class Game {
   update(dt) {
     if (this.isOrientationBlocked) return;
 
+    if (this.prevState === 'cinematic' && this.state === 'menu') {
+      this.ui.triggerMenuFadeIn();
+    }
+    this.prevState = this.state;
+
     this.updateMobileControlsVisibility();
 
     if (this.state === 'cinematic') {
@@ -541,8 +682,14 @@ class Game {
       this.enemies.update(dt, worldSpeed);
       this.powerups.update(dt, worldSpeed);
       this.events.update(dt, worldSpeed);
+      this.chapters.update(dt, worldSpeed);
       this.particles.update(dt);
-    } else if (this.state === 'gameover' || this.state === 'menu' || this.state === 'disasters') {
+    } else if (this.state === 'chapter_intro' || this.state === 'chapter_rescue') {
+      this.chapters.update(dt, 0);
+      this.particles.update(dt);
+    } else if (
+      ['gameover', 'menu', 'disasters', 'upgrades', 'friends_collection'].includes(this.state)
+    ) {
       this.particles.update(dt);
     }
   }
@@ -575,6 +722,7 @@ class Game {
       this.powerups.draw(this.ctx);
       this.enemies.draw(this.ctx);
       this.player.draw(this.ctx);
+      this.chapters.drawHazards(this.ctx);
       this.events.draw(this.ctx);
       this.particles.draw(this.ctx);
     } else {
@@ -585,6 +733,10 @@ class Game {
     this.ctx.restore();
 
     this.ui.draw(this.ctx);
+
+    if (this.state === 'chapter_rescue') {
+      this.particles.draw(this.ctx);
+    }
   }
 }
 

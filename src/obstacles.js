@@ -453,18 +453,37 @@ class ObstacleManager {
 
   trySpawnObstacle() {
     const Utils = window.OopsWorld.Utils;
+    const ch = this.game.activeChapter;
+    const dist = this.game.world.distance;
+
+    if (ch && dist >= ch.targetDistance - 18) return;
+
     const spawnX = this.game.width + Utils.randFloat(40, 100);
     const groundInfo = this.game.world.getGroundAt(spawnX);
 
     if (groundInfo.isGap) return;
 
-    const dist = this.game.world.distance;
-    const pool = [OBSTACLE_TYPES.ROCK, OBSTACLE_TYPES.SPIKES, OBSTACLE_TYPES.SPRING_PAD];
-
-    if (dist > 30) pool.push(OBSTACLE_TYPES.LOW_BARRIER);
-    if (dist > 60) pool.push(OBSTACLE_TYPES.ROLLING_LOG);
-    if (dist > 100) pool.push(OBSTACLE_TYPES.FALLING_ROCK);
-    if (dist > 140) pool.push(OBSTACLE_TYPES.BOUNCING_MINE);
+    let pool;
+    if (ch) {
+      if (ch.id === 'geophysical') {
+        pool = [OBSTACLE_TYPES.ROCK, OBSTACLE_TYPES.FALLING_ROCK, OBSTACLE_TYPES.ROLLING_LOG, OBSTACLE_TYPES.SPRING_PAD];
+        if (dist > 40) pool.push(OBSTACLE_TYPES.LOW_BARRIER, OBSTACLE_TYPES.SPIKES);
+      } else if (ch.id === 'hydrological') {
+        pool = [OBSTACLE_TYPES.SPRING_PAD, OBSTACLE_TYPES.ROCK, OBSTACLE_TYPES.LOW_BARRIER];
+        if (dist > 45) pool.push(OBSTACLE_TYPES.SPIKES);
+      } else if (ch.id === 'meteorological') {
+        pool = [OBSTACLE_TYPES.LOW_BARRIER, OBSTACLE_TYPES.SPRING_PAD, OBSTACLE_TYPES.ROCK];
+        if (dist > 50) pool.push(OBSTACLE_TYPES.SPIKES);
+      } else {
+        pool = [OBSTACLE_TYPES.SPIKES, OBSTACLE_TYPES.ROCK, OBSTACLE_TYPES.LOW_BARRIER, OBSTACLE_TYPES.SPRING_PAD];
+      }
+    } else {
+      pool = [OBSTACLE_TYPES.ROCK, OBSTACLE_TYPES.SPIKES, OBSTACLE_TYPES.SPRING_PAD];
+      if (dist > 30) pool.push(OBSTACLE_TYPES.LOW_BARRIER);
+      if (dist > 60) pool.push(OBSTACLE_TYPES.ROLLING_LOG);
+      if (dist > 100) pool.push(OBSTACLE_TYPES.FALLING_ROCK);
+      if (dist > 140) pool.push(OBSTACLE_TYPES.BOUNCING_MINE);
+    }
 
     const type = Utils.randChoice(pool);
     const obs = new Obstacle(this.game, type, spawnX, groundInfo.y);

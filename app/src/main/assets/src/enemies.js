@@ -119,7 +119,6 @@ class Enemy {
 
       this.game.score += 150;
       this.game.enemiesStomped += 1;
-      this.game.storage?.updateDisasterProgress('biological', 1);
       this.game.particles.burst(this.x, this.y - this.height / 2, 14, {
         color: '#FFD700',
         shape: 'star',
@@ -396,11 +395,14 @@ class EnemyManager {
 
   trySpawnEnemy() {
     const Utils = window.OopsWorld.Utils;
+    const ch = this.game.activeChapter;
+    const dist = this.game.world.distance;
+    if (ch && dist >= ch.targetDistance - 18) return;
+
     const spawnX = this.game.width + Utils.randFloat(50, 120);
     const ground = this.game.world.getGroundAt(spawnX);
     if (ground.isGap) return;
 
-    const dist = this.game.world.distance;
     const pool = [ENEMY_TYPES.SHROOM];
 
     if (dist > 50) pool.push(ENEMY_TYPES.BATTY);

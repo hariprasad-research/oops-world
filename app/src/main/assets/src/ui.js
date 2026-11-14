@@ -6,6 +6,8 @@ class UIManager {
     this.game = game;
     this.activeToast = null;
     this.toastTimer = 0;
+    this.uiTime = 0;
+    this.menuFadeAlpha = 1;
 
     this.touchButtons = {
       jump: { x: 0, y: 0, radius: 46, pressed: false },
@@ -16,12 +18,21 @@ class UIManager {
     this.buttons = [];
   }
 
+  triggerMenuFadeIn() {
+    this.menuFadeAlpha = 0;
+  }
+
   showToast(text, color = '#FF4757', duration = 2.5) {
     this.activeToast = { text, color, duration, maxDuration: duration };
     this.toastTimer = duration;
   }
 
   update(dt) {
+    this.uiTime += dt;
+    if (this.menuFadeAlpha < 1) {
+      this.menuFadeAlpha = Math.min(1, this.menuFadeAlpha + dt * 2.4);
+    }
+
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) {
@@ -75,13 +86,28 @@ class UIManager {
 
     switch (this.game.state) {
       case 'menu':
-        this.drawMainMenu(ctx);
+        if (this.menuFadeAlpha < 1) {
+          ctx.fillStyle = '#070B14';
+          ctx.fillRect(0, 0, this.game.width, this.game.height);
+          ctx.save();
+          ctx.globalAlpha = this.menuFadeAlpha;
+          this.drawMainMenu(ctx);
+          ctx.restore();
+        } else {
+          this.drawMainMenu(ctx);
+        }
         break;
       case 'cinematic':
         this.game.narration.draw(ctx);
         break;
       case 'disasters':
         this.drawDisasterExpeditions(ctx);
+        break;
+      case 'chapter_intro':
+        this.game.chapters.drawChapterIntro(ctx, this.game.width, this.game.height, this);
+        break;
+      case 'chapter_rescue':
+        this.game.chapters.drawRescueCutscene(ctx, this.game.width, this.game.height, this);
         break;
       case 'playing':
         this.drawHUD(ctx);
@@ -94,11 +120,11 @@ class UIManager {
       case 'gameover':
         this.drawGameOver(ctx);
         break;
-      case 'shop_chars':
-        this.drawCharacterShop(ctx);
+      case 'upgrades':
+        this.drawUpgradesShop(ctx);
         break;
-      case 'shop_themes':
-        this.drawThemeShop(ctx);
+      case 'friends_collection':
+        this.drawFriendsCollection(ctx);
         break;
       case 'settings':
         this.drawSettings(ctx);
@@ -162,12 +188,72 @@ class UIManager {
     ctx.fillText(`🪙 ${coinText}`, 238, 38);
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-    this.roundRect(ctx, 325, 18, 110, 30, 8);
+    this.roundRect(ctx, 325, 18, 105, 30, 8);
     ctx.fill();
 
     ctx.fillStyle = '#2ED573';
     ctx.font = 'bold 15px sans-serif';
     ctx.fillText(`⭐ ${this.game.score}`, 334, 38);
+
+    // Active Chapter Goal Progress Pill (top-right, left of Pause button)
+    const ch = this.game.activeChapter;
+    if (ch) {
+      const w = this.game.width;
+      const distNow = Math.min(ch.targetDistance, Math.floor(this.game.world.distance));
+      const ratio = Math.max(0, Math.min(1, this.game.world.distance / ch.targetDistance));
+      const goalW = Math.min(275, Math.max(195, w - 525));
+      const goalX = w - 72 - goalW;
+      const goalY = 18;
+
+      ctx.fillStyle = 'rgba(10, 15, 29, 0.78)';
+      this.roundRect(ctx, goalX, goalY, goalW, 42, 8);
+      ctx.fill();
+      ctx.strokeStyle = ch.color;
+      ctx.lineWidth = 1.5;
+      this.roundRect(ctx, goalX, goalY, goalW, 42, 8);
+      ctx.stroke();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${ch.icon} CH.${ch.number}: ${distNow}m / ${ch.targetDistance}m`, goalX + 10, goalY + 15);
+
+      ctx.fillStyle = '#7BED9F';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`Rescue ${ch.friendName.split(' ')[0]}`, goalX + goalW - 10, goalY + 15);
+
+      // Bar
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+      this.roundRect(ctx, goalX + 10, goalY + 25, goalW - 20, 8, 4);
+      ctx.fill();
+      if (ratio > 0) {
+        ctx.fillStyle = ratio > 0.85 ? '#2ED573' : ch.color;
+        this.roundRect(ctx, goalX + 10, goalY + 25, Math.max(8, (goalW - 20) * ratio), 8, 4);
+        ctx.fill();
+      }
+
+      // Dynamic condition indicator for Ch. 3 & Ch. 4
+      const dir = this.game.chapters;
+      if (ch.id === 'climatological' && dir) {
+        const isFreeze = dir.climateMode === 'freeze';
+        ctx.fillStyle = isFreeze ? 'rgba(0, 210, 211, 0.85)' : 'rgba(255, 107, 53, 0.85)';
+        this.roundRect(ctx, goalX + goalW - 140, goalY + 48, 140, 22, 6);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(isFreeze ? '❄️ ARCTIC FREEZE' : '🔥 EXTREME HEAT', goalX + goalW - 70, goalY + 63);
+      } else if (ch.id === 'meteorological' && dir && dir.windForce !== 0) {
+        ctx.fillStyle = 'rgba(162, 155, 254, 0.85)';
+        this.roundRect(ctx, goalX + goalW - 135, goalY + 48, 135, 22, 6);
+        ctx.fill();
+        ctx.fillStyle = '#0F172A';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(dir.windForce < 0 ? '💨 HEADWIND' : '💨 TAILWIND', goalX + goalW - 67, goalY + 63);
+      }
+    }
 
     this.drawPowerupTimers(ctx);
 
@@ -184,6 +270,57 @@ class UIManager {
     ctx.fillRect(p.x + 13, p.y + 11, 6, 22);
     ctx.fillRect(p.x + 25, p.y + 11, 6, 22);
 
+    // Direct in-game Hero & Theme quick-switch pills — shown only in Endless Mode
+    if (!this.game.activeChapter) {
+      const chars = window.OopsWorld.CHARACTERS || [];
+      const themes = window.OopsWorld.THEMES || [];
+      const curChar = chars.find((c) => c.id === (this.game.storage?.data?.selectedCharacter || 'bobo')) || { name: 'Bobo' };
+      const curTheme = this.game.world?.theme || themes.find((t) => t.id === (this.game.storage?.data?.selectedTheme || 'forest')) || { name: 'Green Haven' };
+      const curThemeObj = themes.find((t) => t.id === curTheme.id) || curTheme;
+      const pillGap = 10;
+      const heroPillW = 128;
+      const themePillW = 148;
+      const barW = heroPillW + pillGap + themePillW;
+      const barX = this.game.width / 2 - barW / 2;
+      const barY = this.game.height - 52;
+      const heroLabel = curChar.name.split(' ')[0];
+      const themeLabel = (curThemeObj.name || 'Theme').split(' ')[0];
+
+      this.drawHudPill(ctx, 'hud_hero_btn', barX, barY, heroPillW, 44, `🦸 ${heroLabel} ↻`, '#00D2FF', () => {
+        const unlockedCount = chars.filter((c) => this.game.storage?.isCharacterUnlocked(c.id)).length;
+        if (unlockedCount <= 1) {
+          this.showToast('UNLOCK WORLD 2+ FOR MORE HEROES!', '#FFA502', 1.8);
+          return;
+        }
+        const next = this.game.cycleHero();
+        if (next) this.showToast(`HERO: ${next.name.toUpperCase()}!`, '#00D2FF', 1.6);
+      });
+
+      this.drawHudPill(ctx, 'hud_theme_btn', barX + heroPillW + pillGap, barY, themePillW, 44, `🌄 ${themeLabel} ↻`, '#FFA502', () => {
+        const next = this.game.cycleTheme();
+        if (next) this.showToast(`THEME: ${next.name.toUpperCase()}!`, '#FFA502', 1.6);
+      });
+    }
+
+    ctx.restore();
+  }
+
+  drawHudPill(ctx, id, x, y, width, height, label, accentColor, onClick) {
+    this.registerButton(id, x, y, width, height, onClick);
+    ctx.save();
+    ctx.fillStyle = 'rgba(11, 18, 34, 0.72)';
+    this.roundRect(ctx, x, y + 6, width, height - 12, 10);
+    ctx.fill();
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 1.4;
+    this.roundRect(ctx, x, y + 6, width, height - 12, 10);
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + width / 2, y + height / 2);
     ctx.restore();
   }
 
@@ -191,32 +328,43 @@ class UIManager {
     const p = this.game.player.powerups;
     const active = [];
 
-    if (p.shield) active.push({ name: 'SHIELD', icon: '🛡️', color: '#00F0FF', progress: 1 });
-    if (p.magnetTimer > 0) active.push({ name: 'MAGNET', icon: '🧲', color: '#FFD700', progress: p.magnetTimer / 11 });
-    if (p.speedTimer > 0) active.push({ name: 'SPEED', icon: '⚡', color: '#FF4757', progress: p.speedTimer / 6.5 });
-    if (p.doubleCoinsTimer > 0) active.push({ name: '2X COINS', icon: '🪙', color: '#FFA502', progress: p.doubleCoinsTimer / 12 });
-    if (p.slowMoTimer > 0) active.push({ name: 'SLOW-MO', icon: '⏱️', color: '#70A1FF', progress: p.slowMoTimer / 7 });
+    if (p.shield) {
+      const ratio = p.shieldTimer > 0 && p.shieldMax > 0 ? Math.min(1, p.shieldTimer / p.shieldMax) : 1;
+      active.push({ name: 'SHIELD', icon: '🛡️', color: '#00F0FF', progress: ratio });
+    }
+    if (p.magnetTimer > 0) {
+      active.push({ name: 'MAGNET', icon: '🧲', color: '#FFD700', progress: Math.min(1, p.magnetTimer / (p.magnetMax || 11)) });
+    }
+    if (p.speedTimer > 0) {
+      active.push({ name: 'SPEED', icon: '⚡', color: '#FF4757', progress: Math.min(1, p.speedTimer / (p.speedMax || 6.5)) });
+    }
+    if (p.doubleCoinsTimer > 0) {
+      active.push({ name: '2X COINS', icon: '🪙', color: '#FFA502', progress: Math.min(1, p.doubleCoinsTimer / (p.doubleCoinsMax || 12)) });
+    }
+    if (p.slowMoTimer > 0) {
+      active.push({ name: 'SLOW-MO', icon: '⏱️', color: '#70A1FF', progress: Math.min(1, p.slowMoTimer / (p.slowMoMax || 7)) });
+    }
 
     const startX = 28;
     const startY = 66;
 
     active.forEach((item, idx) => {
-      const bx = startX + idx * 72;
+      const bx = startX + idx * 78;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      this.roundRect(ctx, bx, startY, 66, 24, 6);
+      this.roundRect(ctx, bx, startY, 72, 24, 6);
       ctx.fill();
 
       ctx.strokeStyle = item.color;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(bx + 6, startY + 22);
-      ctx.lineTo(bx + 6 + 54 * item.progress, startY + 22);
+      ctx.lineTo(bx + 6 + 60 * Math.max(0.05, item.progress), startY + 22);
       ctx.stroke();
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 11px sans-serif';
+      ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`${item.icon} ${item.name}`, bx + 6, startY + 14);
+      ctx.fillText(`${item.icon} ${item.name}`, bx + 5, startY + 14);
     });
   }
 
@@ -227,119 +375,605 @@ class UIManager {
   drawMainMenu(ctx) {
     const w = this.game.width;
     const h = this.game.height;
+    const storageMgr = this.game.storage;
+    const storage = storageMgr.data;
 
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+    // 1. Subdued 2D Platformer Night-Sky Scenery (Moon, Stars, Clouds, Mountains & Grass Platforms)
+    this.drawMainMenuBackdrop(ctx, w, h);
+
+    const contentW = Math.min(700, w - 44);
+    const scaleY = h < 540 ? Math.max(0.84, h / 600) : 1;
+
+    // 2. Clean Flat Indie Title + Subtle Brackets (No "PART 1")
+    const titleBob = Math.sin(this.uiTime * 2.5) * 3;
+    ctx.save();
+    ctx.translate(w / 2, Math.round(62 * scaleY) + titleBob);
+
+    const oopsText = 'OOPS!';
+    const worldText = ' WORLD';
+    const titleSize = Math.min(46, Math.max(32, Math.floor(contentW * 0.07)));
+    ctx.font = `900 ${titleSize}px sans-serif`;
+    const oopsW = ctx.measureText(oopsText).width;
+    const worldW = ctx.measureText(worldText).width;
+    const fullTitleW = oopsW + worldW;
+    const startTitleX = -fullTitleW / 2;
+
+    // Subtle slate framing brackets
+    const brPadX = 18;
+    const brLeft = startTitleX - brPadX;
+    const brRight = startTitleX + fullTitleW + brPadX;
+    const brTop = -titleSize * 0.84;
+    const brBot = 10;
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(brLeft + 12, brTop);
+    ctx.lineTo(brLeft, brTop);
+    ctx.lineTo(brLeft, brTop + 12);
+    ctx.moveTo(brLeft + 12, brBot);
+    ctx.lineTo(brLeft, brBot);
+    ctx.lineTo(brLeft, brBot - 12);
+    ctx.moveTo(brRight - 12, brTop);
+    ctx.lineTo(brRight, brTop);
+    ctx.lineTo(brRight, brTop + 12);
+    ctx.moveTo(brRight - 12, brBot);
+    ctx.lineTo(brRight, brBot);
+    ctx.lineTo(brRight, brBot - 12);
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    // Crisp solid dark outline + flat balanced title fills (no neon glow)
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#0B1220';
+    ctx.strokeText(oopsText, startTitleX, 0);
+    ctx.fillStyle = '#F1F5F9';
+    ctx.fillText(oopsText, startTitleX, 0);
+
+    ctx.strokeText(worldText, startTitleX + oopsW, 0);
+    ctx.fillStyle = '#4EA1E0';
+    ctx.fillText(worldText, startTitleX + oopsW, 0);
+
+    // Muted Gold Subtitle (No PART 1)
+    ctx.textAlign = 'center';
+    ctx.font = `800 ${Math.max(14, Math.floor(titleSize * 0.37))}px sans-serif`;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#0B1220';
+    ctx.strokeText('★ THE GREAT DISASTER ★', 0, 26);
+    ctx.fillStyle = '#DFAA38';
+    ctx.fillText('★ THE GREAT DISASTER ★', 0, 26);
+    ctx.restore();
+
+    // 3. Bobo / Selected Hero on Clean Flat Grass Pedestal
+    const pedY = Math.round(168 * scaleY);
+    const pedW = 114;
+    ctx.save();
+
+    // Matte soil pedestal base
+    ctx.fillStyle = '#251E2B';
+    ctx.strokeStyle = '#151019';
+    ctx.lineWidth = 1.5;
+    this.roundRect(ctx, w / 2 - pedW / 2 + 6, pedY + 5, pedW - 12, 18, 5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Clean flat mossy green grass top
+    ctx.fillStyle = '#2E7D4F';
+    this.roundRect(ctx, w / 2 - pedW / 2, pedY - 2, pedW, 10, 4);
+    ctx.fill();
+    ctx.fillStyle = '#3B945E';
+    ctx.fillRect(w / 2 - pedW / 2 + 4, pedY - 2, pedW - 8, 3);
+
+    // Small flat grass tufts
+    ctx.fillStyle = '#3B945E';
+    [-40, -18, 20, 38].forEach((gx) => {
+      ctx.beginPath();
+      ctx.moveTo(w / 2 + gx - 4, pedY);
+      ctx.lineTo(w / 2 + gx, pedY - 6);
+      ctx.lineTo(w / 2 + gx + 4, pedY);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    // Subtle accent rays flanking Bobo
+    ctx.strokeStyle = 'rgba(223, 170, 56, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    [
+      [-34, pedY - 24, -46, pedY - 29],
+      [-36, pedY - 15, -49, pedY - 15],
+      [-33, pedY - 7, -45, pedY - 3],
+      [34, pedY - 24, 46, pedY - 29],
+      [36, pedY - 15, 49, pedY - 15],
+      [33, pedY - 7, 45, pedY - 3]
+    ].forEach(([x1, y1, x2, y2]) => {
+      ctx.beginPath();
+      ctx.moveTo(w / 2 + x1, y1);
+      ctx.lineTo(w / 2 + x2, y2);
+      ctx.stroke();
+    });
+
+    // Render animated selected hero (Bobo by default) perched on pedestal
+    ctx.save();
+    ctx.translate(w / 2, pedY + Math.sin(this.uiTime * 3.5) * 2);
+    ctx.scale(1.06, 1.06);
+    const p = this.game.player;
+    const prevId = p.characterId;
+    p.characterId = storage.selectedCharacter || 'bobo';
+    p.runCycle = this.uiTime * 7;
+    p.drawCharacterBody(ctx);
+    p.characterId = prevId;
+    ctx.restore();
+    ctx.restore();
+
+    // 4. Clean Flat Horizontal Status Bar (Coins, Best Score, World Progress X/6, Friends Rescued Y/5)
+    const allWorldIds = window.OopsWorld.CHAPTER_ORDER || [
+      'geophysical',
+      'hydrological',
+      'meteorological',
+      'climatological',
+      'biological',
+      'extraterrestrial'
+    ];
+    const completedWorlds = (storage.story?.completedChapters || []).filter((id) =>
+      allWorldIds.includes(id)
+    ).length;
+    const rescuedFriends = Math.min(
+      5,
+      (storage.story?.rescuedFriends || []).filter((id) => id !== 'bobo').length
+    );
+
+    const barW = Math.min(contentW, w - 36);
+    const barH = Math.round(38 * scaleY);
+    const barX = w / 2 - barW / 2;
+    const barY = pedY + 28;
+
+    ctx.save();
+    ctx.fillStyle = '#18243A';
+    this.roundRect(ctx, barX, barY, barW, barH, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#334666';
+    ctx.lineWidth = 1.5;
+    this.roundRect(ctx, barX, barY, barW, barH, 10);
+    ctx.stroke();
+
+    const statusSegments = [
+      { icon: '🪙', label: `${storage.totalCoins} Coins`, color: '#E2E8F0' },
+      { icon: '🏆', label: `Best: ${storage.highScore} pts`, color: '#E2E8F0' },
+      { icon: '📘', label: `Worlds: ${completedWorlds}/6`, color: '#CBD5E1' },
+      { icon: '👥', label: `Rescued: ${rescuedFriends}/5`, color: '#CBD5E1' }
+    ];
+    const segW = barW / 4;
+    const statusFontSize = Math.max(11, Math.min(13, Math.floor(barW * 0.0195)));
+    ctx.font = `bold ${statusFontSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    statusSegments.forEach((seg, idx) => {
+      const cx = barX + segW * (idx + 0.5);
+      const cy = barY + barH / 2 + 1;
+      ctx.fillStyle = seg.color;
+      ctx.fillText(`${seg.icon} ${seg.label}`, cx, cy);
+
+      if (idx < 3) {
+        const divX = barX + segW * (idx + 1);
+        ctx.strokeStyle = '#2C3D5B';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(divX, barY + 9);
+        ctx.lineTo(divX, barY + barH - 9);
+        ctx.stroke();
+      }
+    });
+    ctx.restore();
+
+    // 5. Primary Buttons Row: CONTINUE + PLAY / WORLDS
+    const nextChId = storageMgr.getHighestPlayableChapter();
+    const nextMeta = this.game.chapters.getCardMeta(nextChId);
+    const rowGap = Math.round(14 * scaleY);
+    const mainGap = 16;
+    const mainRowW = Math.min(contentW - 12, 650);
+    const mainBtnW = Math.floor((mainRowW - mainGap) / 2);
+    const mainBtnH = Math.round(54 * scaleY);
+    const mainRowY = barY + barH + Math.round(18 * scaleY);
+    const mainStartX = w / 2 - (mainBtnW * 2 + mainGap) / 2;
+
+    this.drawArcadeMenuButton(ctx, {
+      id: 'continue_btn',
+      x: mainStartX,
+      y: mainRowY,
+      width: mainBtnW,
+      height: mainBtnH,
+      label: `▶  CONTINUE (CH. ${nextMeta.number})`,
+      fillColor: '#2E8B57',
+      borderColor: '#1E5E3A',
+      lipColor: '#1B5233',
+      fontSize: 16,
+      onClick: () => {
+        this.game.continueCampaign();
+      }
+    });
+
+    this.drawArcadeMenuButton(ctx, {
+      id: 'play_btn',
+      x: mainStartX + mainBtnW + mainGap,
+      y: mainRowY,
+      width: mainBtnW,
+      height: mainBtnH,
+      label: '🌍  PLAY / WORLDS',
+      fillColor: '#2C7AB8',
+      borderColor: '#1B527F',
+      lipColor: '#184A73',
+      fontSize: 16,
+      onClick: () => {
+        this.game.state = 'disasters';
+      }
+    });
+
+    // 6. Secondary Buttons Row: UPGRADES | FRIENDS (X/6) | ENDLESS
+    const secGap = 14;
+    const secRowW = Math.min(contentW, 680);
+    const secBtnW = Math.floor((secRowW - secGap * 2) / 3);
+    const secBtnH = Math.round(48 * scaleY);
+    const secRowY = mainRowY + mainBtnH + rowGap;
+    const secStartX = w / 2 - (secBtnW * 3 + secGap * 2) / 2;
+    const unlockedHeroesCount = (window.OopsWorld.CHARACTERS || []).filter((c) =>
+      storageMgr.isCharacterUnlocked(c.id)
+    ).length;
+
+    this.drawArcadeMenuButton(ctx, {
+      id: 'upgrades_btn',
+      x: secStartX,
+      y: secRowY,
+      width: secBtnW,
+      height: secBtnH,
+      label: '⚡  UPGRADES',
+      fillColor: '#D97724',
+      borderColor: '#9A4F12',
+      lipColor: '#8B460E',
+      fontSize: 14,
+      onClick: () => {
+        this.game.state = 'upgrades';
+      }
+    });
+
+    this.drawArcadeMenuButton(ctx, {
+      id: 'friends_btn',
+      x: secStartX + secBtnW + secGap,
+      y: secRowY,
+      width: secBtnW,
+      height: secBtnH,
+      label: `👥  FRIENDS (${unlockedHeroesCount}/6)`,
+      fillColor: '#298967',
+      borderColor: '#195C44',
+      lipColor: '#15513C',
+      fontSize: 14,
+      onClick: () => {
+        this.game.state = 'friends_collection';
+      }
+    });
+
+    this.drawArcadeMenuButton(ctx, {
+      id: 'endless_btn',
+      x: secStartX + (secBtnW + secGap) * 2,
+      y: secRowY,
+      width: secBtnW,
+      height: secBtnH,
+      label: '∞  ENDLESS',
+      fillColor: '#3165B5',
+      borderColor: '#1E437C',
+      lipColor: '#1A3B6E',
+      fontSize: 14,
+      onClick: () => {
+        this.game.startEndless();
+      }
+    });
+
+    // 7. Bottom Buttons Row: SETTINGS | GUIDE | INTRO MOVIE
+    const botRowY = secRowY + secBtnH + rowGap;
+
+    this.drawArcadeMenuButton(ctx, {
+      id: 'settings_btn',
+      x: secStartX,
+      y: botRowY,
+      width: secBtnW,
+      height: secBtnH,
+      label: '⚙  SETTINGS',
+      fillColor: '#4B596E',
+      borderColor: '#313C4C',
+      lipColor: '#2A3342',
+      fontSize: 14,
+      onClick: () => {
+        this.game.state = 'settings';
+      }
+    });
+
+    this.drawArcadeMenuButton(ctx, {
+      id: 'howto_btn',
+      x: secStartX + secBtnW + secGap,
+      y: botRowY,
+      width: secBtnW,
+      height: secBtnH,
+      label: '📖  GUIDE',
+      fillColor: '#7B4EB2',
+      borderColor: '#53327D',
+      lipColor: '#482B6D',
+      fontSize: 14,
+      onClick: () => {
+        this.game.state = 'howto';
+      }
+    });
+
+    this.drawArcadeMenuButton(ctx, {
+      id: 'cinematic_replay_btn',
+      x: secStartX + (secBtnW + secGap) * 2,
+      y: botRowY,
+      width: secBtnW,
+      height: secBtnH,
+      label: '🎬  INTRO MOVIE',
+      fillColor: '#4B596E',
+      borderColor: '#313C4C',
+      lipColor: '#2A3342',
+      fontSize: 14,
+      onClick: () => {
+        this.game.narration.startOpeningCinematic(false);
+      }
+    });
+  }
+
+  drawMainMenuBackdrop(ctx, w, h) {
+    ctx.save();
+
+    // Subdued, desaturated night-slate sky
+    ctx.fillStyle = '#0F172A';
     ctx.fillRect(0, 0, w, h);
 
-    const titleBob = Math.sin(Date.now() / 200) * 8;
-    ctx.save();
-    ctx.translate(w / 2, 85 + titleBob);
+    // Subtle soft horizon band (flat layered tone, low brightness)
+    ctx.fillStyle = '#141E36';
+    ctx.fillRect(0, h * 0.42, w, h * 0.58);
 
-    ctx.font = '900 48px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#FF4757';
-    ctx.fillText('OOPS!', 0, 0);
+    // Subtle matte star dots (no neon cross-glints)
+    for (let i = 0; i < 28; i++) {
+      const sx = ((i * 173 + 41) % 997) / 997 * w;
+      const sy = ((i * 97 + 23) % 521) / 521 * (h * 0.56);
+      const alpha = 0.2 + 0.25 * Math.abs(Math.sin(this.uiTime * (0.9 + (i % 3) * 0.4) + i));
+      ctx.fillStyle = `rgba(203, 213, 225, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, i % 4 === 0 ? 1.5 : 1.0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 2.5;
-    ctx.strokeText('OOPS!', 0, 0);
-
-    ctx.font = '900 24px sans-serif';
-    ctx.fillStyle = '#FFD700';
-    ctx.fillText('★ ENDLESS SURVIVAL WORLD ★', 0, 36);
-
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(w / 2, 195 + Math.sin(Date.now() / 180) * 6);
-    this.game.player.drawBobo(ctx, false, false, false);
-    ctx.restore();
-
-    const storage = this.game.storage.data;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-    this.roundRect(ctx, w / 2 - 180, 245, 360, 38, 12);
+    // Subdued Moon on top-right (clean flat tone, no neon halo)
+    const moonX = w * 0.9;
+    const moonY = h * 0.165;
+    const moonR = Math.min(32, Math.max(22, w * 0.03));
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.12)';
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR * 1.45, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#FFD700';
-    ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = '#B8CBE0';
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#9BB1CA';
+    [
+      [-0.3, -0.2, 0.18],
+      [0.25, 0.18, 0.24],
+      [-0.1, 0.42, 0.13]
+    ].forEach(([dx, dy, sr]) => {
+      ctx.beginPath();
+      ctx.arc(moonX + dx * moonR, moonY + dy * moonR, moonR * sr, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Muted flat night clouds
+    const drawCloud = (cx, cy, cw) => {
+      ctx.fillStyle = '#1A2642';
+      ctx.beginPath();
+      ctx.arc(cx - cw * 0.26, cy + 4, cw * 0.2, 0, Math.PI * 2);
+      ctx.arc(cx, cy - 4, cw * 0.26, 0, Math.PI * 2);
+      ctx.arc(cx + cw * 0.26, cy + 4, cw * 0.19, 0, Math.PI * 2);
+      ctx.rect(cx - cw * 0.42, cy + 2, cw * 0.84, cw * 0.16);
+      ctx.fill();
+    };
+    drawCloud(w * 0.1, h * 0.16, 76);
+    drawCloud(w * 0.2, h * 0.25, 50);
+    drawCloud(w * 0.81, h * 0.26, 54);
+
+    // Distant muted mountain silhouette
+    ctx.fillStyle = '#182440';
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    ctx.lineTo(0, h * 0.56);
+    ctx.lineTo(w * 0.11, h * 0.44);
+    ctx.lineTo(w * 0.23, h * 0.56);
+    ctx.lineTo(w * 0.34, h * 0.46);
+    ctx.lineTo(w * 0.48, h * 0.58);
+    ctx.lineTo(w * 0.62, h * 0.47);
+    ctx.lineTo(w * 0.76, h * 0.56);
+    ctx.lineTo(w * 0.89, h * 0.43);
+    ctx.lineTo(w, h * 0.54);
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Foreground mountain silhouette
+    ctx.fillStyle = '#131D35';
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    ctx.lineTo(0, h * 0.64);
+    ctx.lineTo(w * 0.08, h * 0.53);
+    ctx.lineTo(w * 0.19, h * 0.66);
+    ctx.lineTo(w * 0.3, h * 0.56);
+    ctx.lineTo(w * 0.44, h * 0.68);
+    ctx.lineTo(w * 0.6, h * 0.57);
+    ctx.lineTo(w * 0.72, h * 0.66);
+    ctx.lineTo(w * 0.85, h * 0.52);
+    ctx.lineTo(w * 0.95, h * 0.61);
+    ctx.lineTo(w, h * 0.56);
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Subdued flat grass & earth platforms
+    const centerTopY = h - 42;
+    const sideW = Math.max(76, Math.round(w * 0.095));
+    const sideTopY = h - 76;
+
+    // Center earth base
+    ctx.fillStyle = '#1B1622';
+    ctx.fillRect(0, centerTopY, w, h - centerTopY);
+    ctx.fillStyle = '#251E2E';
+    for (let rx = 80; rx < w - 80; rx += 110) {
+      ctx.fillRect(rx, centerTopY + 14, 48, 10);
+    }
+
+    // Matte natural green grass top
+    ctx.fillStyle = '#2A6B43';
+    ctx.fillRect(sideW - 6, centerTopY, w - (sideW - 6) * 2, 11);
+    ctx.fillStyle = '#378254';
+    ctx.fillRect(sideW - 6, centerTopY, w - (sideW - 6) * 2, 3);
+
+    // Subtle flat grass blades
+    ctx.fillStyle = '#378254';
+    for (let gx = sideW + 30; gx < w - sideW - 30; gx += 140) {
+      ctx.beginPath();
+      ctx.moveTo(gx - 5, centerTopY);
+      ctx.lineTo(gx, centerTopY - 8);
+      ctx.lineTo(gx + 5, centerTopY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Left & Right stepped cliff platforms
+    const drawSideCliff = (x, width, isLeft) => {
+      ctx.fillStyle = '#211B29';
+      ctx.fillRect(x, sideTopY + 6, width, h - sideTopY);
+      ctx.fillStyle = '#2C2436';
+      ctx.fillRect(isLeft ? x + 10 : x + 14, sideTopY + 20, width - 24, 18);
+
+      ctx.fillStyle = '#2A6B43';
+      this.roundRect(ctx, isLeft ? x - 6 : x - 2, sideTopY, width + 8, 12, 4);
+      ctx.fill();
+
+      // Matte bush silhouette on cliff edge
+      const bx = isLeft ? x + width * 0.45 : x + width * 0.55;
+      ctx.fillStyle = '#235938';
+      ctx.beginPath();
+      ctx.arc(bx - 10, sideTopY - 2, 8, 0, Math.PI * 2);
+      ctx.arc(bx + 10, sideTopY - 2, 8, 0, Math.PI * 2);
+      ctx.arc(bx, sideTopY - 6, 10, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    drawSideCliff(0, sideW, true);
+    drawSideCliff(w - sideW, sideW, false);
+
+    ctx.restore();
+  }
+
+  drawArcadeMenuButton(ctx, opts) {
+    const {
+      id,
+      x,
+      y,
+      width,
+      height,
+      label,
+      fillColor,
+      borderColor,
+      lipColor,
+      fontSize = 15,
+      onClick
+    } = opts;
+
+    this.registerButton(id, x, y, width, height, onClick);
+
+    ctx.save();
+
+    // Clean flat bottom lip for tactile 2D button depth (no blurry glow)
+    ctx.fillStyle = lipColor || '#0F172A';
+    this.roundRect(ctx, x, y + 4, width, height, 8);
+    ctx.fill();
+
+    // Crisp flat solid button face
+    ctx.fillStyle = fillColor;
+    this.roundRect(ctx, x, y, width, height, 8);
+    ctx.fill();
+
+    // Clean, sharp border
+    ctx.strokeStyle = borderColor || '#1E293B';
+    ctx.lineWidth = 1.6;
+    this.roundRect(ctx, x, y, width, height, 8);
+    ctx.stroke();
+
+    // Crisp readable label
+    ctx.font = `bold ${fontSize}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(`🏆 BEST: ${storage.highScore} pts  |  🪙 COINS: ${storage.totalCoins}`, w / 2, 270);
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.fillText(label, x + width / 2, y + height / 2 + 1);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(label, x + width / 2, y + height / 2);
 
-    this.drawButton(ctx, 'play_btn', w / 2 - 110, 298, 220, 48, '▶ PLAY GAME', '#2ED573', '#FFFFFF', () => {
-      this.game.startPlaying();
-    });
-
-    this.drawButton(ctx, 'story_btn', w / 2 - 190, 354, 380, 42, '📜 THE GREAT DISASTER — STORY CARDS', '#00D2FF', '#001A33', () => {
-      this.game.state = 'disasters';
-    });
-
-    const btnW = 105;
-    const btnH = 36;
-    const btnY = 406;
-
-    this.drawButton(ctx, 'chars_btn', w / 2 - 225, btnY, btnW, btnH, '👥 HEROES', '#70A1FF', '#FFFFFF', () => {
-      this.game.state = 'shop_chars';
-    });
-
-    this.drawButton(ctx, 'themes_btn', w / 2 - 110, btnY, btnW, btnH, '🌄 THEMES', '#FFA502', '#FFFFFF', () => {
-      this.game.state = 'shop_themes';
-    });
-
-    this.drawButton(ctx, 'settings_btn', w / 2 + 5, btnY, btnW, btnH, '⚙ SETTINGS', '#747D8C', '#FFFFFF', () => {
-      this.game.state = 'settings';
-    });
-
-    this.drawButton(ctx, 'howto_btn', w / 2 + 120, btnY, btnW, btnH, '❓ GUIDE', '#9B59B6', '#FFFFFF', () => {
-      this.game.state = 'howto';
-    });
-
-    this.drawButton(ctx, 'cinematic_replay_btn', w / 2 - 150, 452, 300, 34, '🎬 REPLAY OPENING CINEMATIC', 'rgba(255, 255, 255, 0.16)', '#E2E8F0', () => {
-      this.game.narration.startOpeningCinematic(false);
-    });
+    ctx.restore();
   }
 
   drawGameOver(ctx) {
     const w = this.game.width;
     const h = this.game.height;
+    const ch = this.game.activeChapter;
 
     ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
     ctx.fillRect(0, 0, w, h);
 
     ctx.save();
-    ctx.translate(w / 2, 70);
-    ctx.font = '900 52px sans-serif';
+    ctx.translate(w / 2, 62);
+    ctx.font = '900 46px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FF4757';
     ctx.fillText('OOPS!', 0, 0);
 
-    ctx.font = 'bold 18px sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.fillStyle = '#FFA502';
-    ctx.fillText('BOBO WIPED OUT!', 0, 32);
+    ctx.fillText(
+      ch ? `CHAPTER ${ch.number}: ${ch.title} — RUN ENDED` : 'BOBO WIPED OUT!',
+      0,
+      28
+    );
     ctx.restore();
 
-    const cardW = 320;
-    const cardH = 175;
+    const cardW = 360;
+    const cardH = ch ? 205 : 175;
     const cardX = w / 2 - cardW / 2;
-    const cardY = 125;
+    const cardY = 110;
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
     this.roundRect(ctx, cardX, cardY, cardW, cardH, 16);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.strokeStyle = ch ? ch.color : 'rgba(255, 255, 255, 0.2)';
     ctx.lineWidth = 1.5;
     this.roundRect(ctx, cardX, cardY, cardW, cardH, 16);
     ctx.stroke();
 
     const statRows = [
-      { label: 'Distance Survived:', val: `${Math.floor(this.game.world.distance)} meters` },
+      { label: 'Distance Reached:', val: `${Math.floor(this.game.world.distance)}m` },
       { label: 'Coins Collected:', val: `+${this.game.coinsCollected} 🪙` },
       { label: 'Enemies Stomped:', val: `${this.game.enemiesStomped} 💥` },
-      { label: 'Disasters Survived:', val: `${this.game.disastersSurvived} ⚠️` },
       { label: 'Final Score:', val: `${this.game.score} ⭐`, highlight: true }
     ];
 
+    if (ch) {
+      statRows.unshift({
+        label: 'Rescue Goal:',
+        val: `${Math.min(ch.targetDistance, Math.floor(this.game.world.distance))}m / ${ch.targetDistance}m`
+      });
+    }
+
     statRows.forEach((row, i) => {
-      const ry = cardY + 30 + i * 28;
+      const ry = cardY + 32 + i * 32;
       ctx.fillStyle = row.highlight ? '#FFD700' : '#E2E8F0';
       ctx.font = row.highlight ? 'bold 17px sans-serif' : '15px sans-serif';
       ctx.textAlign = 'left';
@@ -350,20 +984,43 @@ class UIManager {
 
     if (this.game.isNewHigh) {
       ctx.fillStyle = '#2ED573';
-      ctx.font = '900 16px sans-serif';
+      ctx.font = '900 15px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('🎉 NEW HIGH SCORE! 🎉', w / 2, cardY + cardH + 28);
+      ctx.fillText('🎉 NEW HIGH SCORE! 🎉', w / 2, cardY + cardH + 22);
     }
 
-    this.drawButton(ctx, 'retry_btn', w / 2 - 130, 335, 260, 46, '🔄 PLAY AGAIN (Space)', '#2ED573', '#FFFFFF', () => {
-      this.game.startPlaying();
-    });
+    const btnStartY = cardY + cardH + 38;
+    this.drawButton(
+      ctx,
+      'retry_btn',
+      w / 2 - 140,
+      btnStartY,
+      280,
+      46,
+      ch ? `🔄 RETRY CHAPTER ${ch.number}` : '🔄 PLAY AGAIN',
+      '#2ED573',
+      '#FFFFFF',
+      () => {
+        this.game.retryCurrentMode();
+      }
+    );
 
-    this.drawButton(ctx, 'story_cards_btn', w / 2 - 130, 388, 260, 40, '📜 STORY & DISASTER CARDS', '#00D2FF', '#001A33', () => {
-      this.game.state = 'disasters';
-    });
+    this.drawButton(
+      ctx,
+      'story_cards_btn',
+      w / 2 - 140,
+      btnStartY + 56,
+      280,
+      44,
+      '🌍 WORLD SELECTION (CARDS)',
+      '#00D2FF',
+      '#001A33',
+      () => {
+        this.game.state = 'disasters';
+      }
+    );
 
-    this.drawButton(ctx, 'menu_btn', w / 2 - 130, 436, 260, 38, '🏠 MAIN MENU', '#485460', '#FFFFFF', () => {
+    this.drawButton(ctx, 'menu_btn', w / 2 - 140, btnStartY + 110, 280, 44, '🏠 MAIN MENU', '#485460', '#FFFFFF', () => {
       this.game.state = 'menu';
     });
   }
@@ -375,186 +1032,319 @@ class UIManager {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
     ctx.fillRect(0, 0, w, h);
 
-    ctx.font = '900 42px sans-serif';
+    ctx.font = '900 40px sans-serif';
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'center';
-    ctx.fillText('PAUSED', w / 2, 130);
+    ctx.fillText('PAUSED', w / 2, 82);
 
-    this.drawButton(ctx, 'resume_btn', w / 2 - 110, 180, 220, 48, '▶ RESUME', '#2ED573', '#FFFFFF', () => {
+    const isEndlessMode = !this.game.activeChapter;
+
+    // Direct mid-run Hero & Theme selectors inside Pause Menu — Endless Mode only
+    if (isEndlessMode) {
+      const chars = window.OopsWorld.CHARACTERS || [];
+      const themes = window.OopsWorld.THEMES || [];
+      const curChar = chars.find((c) => c.id === (this.game.storage?.data?.selectedCharacter || 'bobo')) || { name: 'Bobo' };
+      const curTheme = this.game.world?.theme || themes.find((t) => t.id === (this.game.storage?.data?.selectedTheme || 'forest')) || { name: 'Green Haven' };
+      const switchW = Math.min(240, Math.floor((w - 84) / 2));
+      const switchGap = 14;
+      const switchX = w / 2 - (switchW * 2 + switchGap) / 2;
+
+      this.drawButton(ctx, 'pause_hero_btn', switchX, 112, switchW, 46, `🦸 HERO: ${curChar.name.split(' ')[0]} ↻`, '#10AC84', '#FFFFFF', () => {
+        const unlockedCount = chars.filter((c) => this.game.storage?.isCharacterUnlocked(c.id)).length;
+        if (unlockedCount <= 1) {
+          this.showToast('UNLOCK WORLD 2+ FOR MORE HEROES!', '#FFA502');
+          return;
+        }
+        const next = this.game.cycleHero();
+        if (next) this.showToast(`HERO: ${next.name.toUpperCase()}!`, '#2ED573');
+      });
+
+      this.drawButton(ctx, 'pause_theme_btn', switchX + switchW + switchGap, 112, switchW, 46, `🌄 THEME: ${(curTheme.name || 'Forest').split(' ')[0]} ↻`, '#FFA502', '#0F172A', () => {
+        const next = this.game.cycleTheme();
+        if (next) this.showToast(`THEME: ${next.name.toUpperCase()}!`, '#FFA502');
+      });
+    }
+
+    const menuStartY = isEndlessMode ? 178 : 118;
+    const btnStep = 56;
+
+    this.drawButton(ctx, 'resume_btn', w / 2 - 125, menuStartY, 250, 46, '▶ RESUME', '#2ED573', '#FFFFFF', () => {
       this.game.togglePause();
     });
 
-    this.drawButton(ctx, 'restart_btn', w / 2 - 110, 240, 220, 48, '🔄 RESTART', '#FFA502', '#FFFFFF', () => {
-      this.game.startPlaying();
+    this.drawButton(ctx, 'restart_btn', w / 2 - 125, menuStartY + btnStep, 250, 46, '🔄 RESTART', '#FFA502', '#FFFFFF', () => {
+      this.game.retryCurrentMode();
     });
 
     const isMuted = this.game.audio.isMuted;
-    this.drawButton(ctx, 'sound_btn', w / 2 - 110, 300, 220, 48, isMuted ? '🔇 SOUND: OFF' : '🔊 SOUND: ON', '#70A1FF', '#FFFFFF', () => {
+    this.drawButton(ctx, 'sound_btn', w / 2 - 125, menuStartY + btnStep * 2, 250, 46, isMuted ? '🔇 SOUND: OFF' : '🔊 SOUND: ON', '#70A1FF', '#FFFFFF', () => {
       this.game.audio.setMuted(!isMuted);
     });
 
-    this.drawButton(ctx, 'exit_btn', w / 2 - 110, 360, 220, 48, '🏠 QUIT TO MENU', '#FF4757', '#FFFFFF', () => {
+    this.drawButton(ctx, 'exit_worlds_btn', w / 2 - 125, menuStartY + btnStep * 3, 250, 46, '🌍 WORLD SELECT', '#00D2FF', '#001A33', () => {
+      this.game.audio.stopMusic();
+      this.game.state = 'disasters';
+    });
+
+    this.drawButton(ctx, 'exit_btn', w / 2 - 125, menuStartY + btnStep * 4, 250, 46, '🏠 MAIN MENU', '#FF4757', '#FFFFFF', () => {
+      this.game.audio.stopMusic();
       this.game.state = 'menu';
     });
   }
 
-  drawCharacterShop(ctx) {
+  drawUpgradesShop(ctx) {
     const w = this.game.width;
     const h = this.game.height;
-    const CHARACTERS = window.OopsWorld.CHARACTERS || [];
+    const UPGRADES = window.OopsWorld.POWERUP_UPGRADES || [];
+    const storageMgr = this.game.storage;
 
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+    ctx.fillStyle = 'rgba(11, 18, 34, 0.96)';
     ctx.fillRect(0, 0, w, h);
 
     ctx.font = '900 30px sans-serif';
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'center';
-    ctx.fillText('CHARACTER SHOP', w / 2, 45);
+    ctx.fillText('⚡ POWER-UP UPGRADES', w / 2, 46);
 
     ctx.font = 'bold 16px sans-serif';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(`YOUR COINS: ${this.game.storage.data.totalCoins} 🪙`, w / 2, 75);
+    ctx.fillText(`AVAILABLE COINS: ${storageMgr.data.totalCoins} 🪙`, w / 2, 76);
 
-    const cardW = 120;
-    const cardH = 220;
-    const totalW = CHARACTERS.length * (cardW + 14) - 14;
+    const gap = 12;
+    const cardW = Math.min(176, Math.floor((w - 64 - gap * (UPGRADES.length - 1)) / UPGRADES.length));
+    const cardH = 285;
+    const totalW = UPGRADES.length * cardW + (UPGRADES.length - 1) * gap;
     const startX = w / 2 - totalW / 2;
 
-    CHARACTERS.forEach((char, idx) => {
-      const cx = startX + idx * (cardW + 14);
-      const cy = 95;
-      const isSelected = this.game.storage.data.selectedCharacter === char.id;
-      const isUnlocked = this.game.storage.data.unlockedCharacters.includes(char.id);
+    UPGRADES.forEach((upg, idx) => {
+      const cx = startX + idx * (cardW + gap);
+      const cy = 104;
+      const lvl = storageMgr.getPowerupLevel(upg.id);
+      const cost = storageMgr.getPowerupUpgradeCost(upg.id);
+      const curDur = storageMgr.getPowerupDuration(upg.id);
+      const isMax = lvl >= upg.maxLevel;
 
-      ctx.fillStyle = isSelected ? 'rgba(46, 213, 115, 0.2)' : 'rgba(255, 255, 255, 0.08)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
       this.roundRect(ctx, cx, cy, cardW, cardH, 12);
       ctx.fill();
-
-      ctx.strokeStyle = isSelected ? '#2ED573' : 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = isSelected ? 2.5 : 1;
+      ctx.strokeStyle = isMax ? '#2ED573' : upg.color;
+      ctx.lineWidth = 1.6;
       this.roundRect(ctx, cx, cy, cardW, cardH, 12);
       ctx.stroke();
 
-      ctx.save();
-      ctx.translate(cx + cardW / 2, cy + 65);
-      const tempId = this.game.player.characterId;
-      this.game.player.characterId = char.id;
-      this.game.player.drawCharacterBody(ctx);
-      this.game.player.characterId = tempId;
-      ctx.restore();
+      ctx.font = '34px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(upg.icon, cx + cardW / 2, cy + 50);
 
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 14px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(char.name, cx + cardW / 2, cy + 115);
+      ctx.fillText(upg.name, cx + cardW / 2, cy + 84);
 
-      ctx.fillStyle = '#FFA502';
+      ctx.fillStyle = '#CBD5E1';
       ctx.font = '11px sans-serif';
-      ctx.fillText(char.trait, cx + cardW / 2, cy + 135);
-
-      if (isSelected) {
-        ctx.fillStyle = '#2ED573';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText('SELECTED ✔', cx + cardW / 2, cy + 185);
-      } else if (isUnlocked) {
-        this.drawButton(ctx, `sel_${char.id}`, cx + 12, cy + 165, cardW - 24, 32, 'SELECT', '#70A1FF', '#FFF', () => {
-          this.game.storage.selectCharacter(char.id);
-          this.game.player.applyCharacterTraits();
-        });
+      ctx.fillText(`Duration: ${curDur.toFixed(1)}s`, cx + cardW / 2, cy + 108);
+      if (!isMax) {
+        ctx.fillStyle = '#7BED9F';
+        ctx.fillText(`Next: ${(curDur + upg.perLevel).toFixed(1)}s`, cx + cardW / 2, cy + 126);
       } else {
-        const canAfford = this.game.storage.data.totalCoins >= char.cost;
-        const btnCol = canAfford ? '#FFD700' : '#57606F';
-        this.drawButton(ctx, `buy_${char.id}`, cx + 8, cy + 165, cardW - 16, 32, `🪙 ${char.cost}`, btnCol, '#000', () => {
-          if (this.game.storage.unlockCharacter(char.id)) {
-            this.game.player.applyCharacterTraits();
-            this.game.audio.playPowerup();
-            this.showToast(`UNLOCKED ${char.name.toUpperCase()}! 🎉`, '#2ED573');
-          } else {
-            this.showToast('NOT ENOUGH COINS! 🪙', '#FF4757');
+        ctx.fillStyle = '#2ED573';
+        ctx.fillText('MAX POWER!', cx + cardW / 2, cy + 126);
+      }
+
+      // Level pips
+      const pipW = 22;
+      const pipStart = cx + cardW / 2 - (upg.maxLevel * (pipW + 5) - 5) / 2;
+      for (let i = 0; i < upg.maxLevel; i++) {
+        ctx.fillStyle = i < lvl ? upg.color : 'rgba(255, 255, 255, 0.16)';
+        this.roundRect(ctx, pipStart + i * (pipW + 5), cy + 146, pipW, 10, 4);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`LEVEL ${lvl} / ${upg.maxLevel}`, cx + cardW / 2, cy + 178);
+
+      if (isMax) {
+        ctx.fillStyle = '#2ED573';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText('MAXED ✔', cx + cardW / 2, cy + 236);
+      } else {
+        const canAfford = storageMgr.data.totalCoins >= cost;
+        this.drawButton(
+          ctx,
+          `upg_${upg.id}`,
+          cx + 10,
+          cy + 216,
+          cardW - 20,
+          46,
+          `UPGRADE 🪙 ${cost}`,
+          canAfford ? '#FFD700' : '#475569',
+          canAfford ? '#0F172A' : '#E2E8F0',
+          () => {
+            const res = storageMgr.upgradePowerup(upg.id);
+            if (res.success) {
+              this.game.audio.playPowerup();
+              this.showToast(`${upg.name.toUpperCase()} LV.${res.newLevel}!`, '#2ED573');
+            } else {
+              this.showToast('NEED MORE COINS! 🪙', '#FF4757');
+            }
           }
-        });
+        );
       }
     });
 
-    this.drawButton(ctx, 'chars_back', w / 2 - 70, 390, 140, 42, '⬅ BACK', '#485460', '#FFF', () => {
+    this.drawButton(ctx, 'upg_back', w / 2 - 190, 430, 175, 46, '◀ MAIN MENU', '#485460', '#FFFFFF', () => {
       this.game.state = 'menu';
+    });
+    this.drawButton(ctx, 'upg_worlds', w / 2 + 15, 430, 175, 46, '🌍 WORLDS', '#00D2FF', '#001A33', () => {
+      this.game.state = 'disasters';
     });
   }
 
-  drawThemeShop(ctx) {
+  drawFriendsCollection(ctx) {
     const w = this.game.width;
     const h = this.game.height;
-    const THEMES = window.OopsWorld.THEMES || [];
+    const storageMgr = this.game.storage;
+    const CHARACTERS = window.OopsWorld.CHARACTERS || [];
+    const CHAPTER_CARDS = window.OopsWorld.CHAPTER_CARDS || [];
+    const unlockedCount = CHARACTERS.filter((c) => storageMgr.isCharacterUnlocked(c.id)).length;
 
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+    ctx.fillStyle = 'rgba(11, 18, 34, 0.96)';
     ctx.fillRect(0, 0, w, h);
 
-    ctx.font = '900 30px sans-serif';
-    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 26px sans-serif';
+    ctx.fillStyle = '#2ED573';
     ctx.textAlign = 'center';
-    ctx.fillText('WORLD THEMES', w / 2, 45);
+    ctx.fillText(`🏕 FRIENDS & HEROES (${unlockedCount}/${CHARACTERS.length} Unlocked)`, w / 2, 34);
 
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillStyle = '#FFD700';
-    ctx.fillText(`YOUR COINS: ${this.game.storage.data.totalCoins} 🪙`, w / 2, 75);
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = '#CBD5E1';
+    ctx.fillText('Bobo starts ready in World 1. Unlock Worlds 2–6 to unlock every hero! Themes are free anytime.', w / 2, 56);
 
-    const cardW = 140;
-    const cardH = 200;
-    const totalW = THEMES.length * (cardW + 14) - 14;
+    const cols = 3;
+    const gapX = 14;
+    const gapY = 12;
+    const cardW = Math.min(290, Math.floor((w - 56 - gapX * (cols - 1)) / cols));
+    const cardH = 204;
+    const totalW = cols * cardW + (cols - 1) * gapX;
     const startX = w / 2 - totalW / 2;
+    const startY = 72;
 
-    THEMES.forEach((theme, idx) => {
-      const cx = startX + idx * (cardW + 14);
-      const cy = 105;
-      const isSelected = this.game.storage.data.selectedTheme === theme.id;
-      const isUnlocked = this.game.storage.data.unlockedThemes.includes(theme.id);
+    CHARACTERS.forEach((char, idx) => {
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      const cx = startX + col * (cardW + gapX);
+      const cy = startY + row * (cardH + gapY);
 
-      ctx.fillStyle = isSelected ? 'rgba(46, 213, 115, 0.2)' : 'rgba(255, 255, 255, 0.08)';
+      const worldNum = char.unlockWorldNum || idx + 1;
+      const worldCard = CHAPTER_CARDS.find((c) => c.id === char.unlockChapter) || CHAPTER_CARDS[idx];
+      const isUnlocked = storageMgr.isCharacterUnlocked(char.id);
+      const isSelected = isUnlocked && (storageMgr.data.selectedCharacter || 'bobo') === char.id;
+      const accent = isUnlocked ? (worldCard ? worldCard.color : char.color) : '#475569';
+
+      ctx.fillStyle = isSelected
+        ? 'rgba(46, 213, 115, 0.22)'
+        : isUnlocked
+          ? 'rgba(16, 172, 132, 0.13)'
+          : 'rgba(15, 23, 42, 0.85)';
       this.roundRect(ctx, cx, cy, cardW, cardH, 12);
       ctx.fill();
+      ctx.strokeStyle = isSelected ? '#2ED573' : accent;
+      ctx.lineWidth = isSelected ? 2.4 : 1.4;
+      this.roundRect(ctx, cx, cy, cardW, cardH, 12);
+      ctx.stroke();
 
-      ctx.fillStyle = theme.skyTop;
-      this.roundRect(ctx, cx + 18, cy + 20, cardW - 36, 40, 8);
-      ctx.fill();
+      // World badge header
+      ctx.fillStyle = isUnlocked ? accent : '#94A3B8';
+      ctx.font = '900 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `${worldCard ? worldCard.icon : '⭐'} WORLD ${worldNum} HERO`,
+        cx + cardW / 2,
+        cy + 20
+      );
 
-      ctx.fillStyle = theme.groundColor;
-      ctx.fillRect(cx + 18, cy + 45, cardW - 36, 15);
+      // Animated character sprite (dimmed + lock badge if locked)
+      ctx.save();
+      ctx.translate(cx + cardW / 2, cy + 78);
+      ctx.scale(1.05, 1.05);
+      if (!isUnlocked) {
+        ctx.globalAlpha = 0.28;
+      }
+      this.game.chapters.drawFriendSprite(ctx, char.id, 0, 0, this.uiTime + idx, !isUnlocked);
+      ctx.restore();
 
-      ctx.fillStyle = '#FFFFFF';
+      if (!isUnlocked) {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        this.roundRect(ctx, cx + cardW / 2 - 36, cy + 44, 72, 22, 8);
+        ctx.fill();
+        ctx.strokeStyle = '#64748B';
+        ctx.lineWidth = 1.2;
+        this.roundRect(ctx, cx + cardW / 2 - 36, cy + 44, 72, 22, 8);
+        ctx.stroke();
+        ctx.fillStyle = '#F87171';
+        ctx.font = '900 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔒 LOCKED', cx + cardW / 2, cy + 58);
+      }
+
+      ctx.fillStyle = isUnlocked ? '#FFFFFF' : '#94A3B8';
       ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(theme.name, cx + cardW / 2, cy + 90);
+      ctx.fillText(char.name, cx + cardW / 2, cy + 102);
 
-      ctx.fillStyle = '#A4B0BE';
-      ctx.font = '10px sans-serif';
-      ctx.fillText(theme.desc, cx + cardW / 2, cy + 112);
+      ctx.fillStyle = isUnlocked ? '#FFD700' : '#64748B';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(char.trait, cx + cardW / 2, cy + 120);
+
+      ctx.fillStyle = isUnlocked ? '#7BED9F' : '#FCA5A5';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(
+        isUnlocked
+          ? (worldNum === 1 ? '✅ Unlocked from Start' : `✅ World ${worldNum} Unlocked`)
+          : `🔒 Unlock World ${worldNum} to Play`,
+        cx + cardW / 2,
+        cy + 139
+      );
 
       if (isSelected) {
+        ctx.fillStyle = 'rgba(46, 213, 115, 0.25)';
+        this.roundRect(ctx, cx + 10, cy + 150, cardW - 20, 44, 10);
+        ctx.fill();
+        ctx.strokeStyle = '#2ED573';
+        ctx.lineWidth = 1.8;
+        this.roundRect(ctx, cx + 10, cy + 150, cardW - 20, 44, 10);
+        ctx.stroke();
         ctx.fillStyle = '#2ED573';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText('ACTIVE ✔', cx + cardW / 2, cy + 160);
+        ctx.font = '900 13px sans-serif';
+        ctx.fillText('ACTIVE HERO ✔', cx + cardW / 2, cy + 176);
       } else if (isUnlocked) {
-        this.drawButton(ctx, `sel_theme_${theme.id}`, cx + 18, cy + 145, cardW - 36, 32, 'APPLY', '#70A1FF', '#FFF', () => {
-          this.game.storage.selectTheme(theme.id);
-          this.game.world.theme = theme;
+        this.drawButton(ctx, `fr_sel_${char.id}`, cx + 10, cy + 150, cardW - 20, 44, 'SELECT HERO', '#2ED573', '#062010', () => {
+          const picked = this.game.selectHero(char.id);
+          if (picked) {
+            this.showToast(`${char.name.toUpperCase()} SELECTED!`, '#2ED573');
+          }
         });
       } else {
-        const canAfford = this.game.storage.data.totalCoins >= theme.cost;
-        const btnCol = canAfford ? '#FFD700' : '#57606F';
-        this.drawButton(ctx, `buy_theme_${theme.id}`, cx + 14, cy + 145, cardW - 28, 32, `🪙 ${theme.cost}`, btnCol, '#000', () => {
-          if (this.game.storage.unlockTheme(theme.id)) {
-            this.game.world.theme = theme;
-            this.game.audio.playPowerup();
-            this.showToast(`UNLOCKED ${theme.name.toUpperCase()}! 🌄`, '#2ED573');
-          } else {
-            this.showToast('NOT ENOUGH COINS! 🪙', '#FF4757');
-          }
+        this.drawButton(ctx, `fr_locked_${char.id}`, cx + 10, cy + 150, cardW - 20, 44, '🔒 LOCKED', '#334155', '#CBD5E1', () => {
+          this.showToast(`🔒 LOCKED! UNLOCK WORLD ${worldNum} FIRST!`, '#FF4757');
         });
       }
     });
 
-    this.drawButton(ctx, 'themes_back', w / 2 - 70, 380, 140, 42, '⬅ BACK', '#485460', '#FFF', () => {
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = 'italic 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Switch unlocked Heroes & Themes anytime in Pause or during play · Clear Worlds to unlock new Heroes!', w / 2, 512);
+
+    const bGap = 16;
+    const bW = Math.min(220, Math.floor((w - 84 - bGap) / 2));
+    const bStartX = w / 2 - (bW * 2 + bGap) / 2;
+
+    this.drawButton(ctx, 'fr_back', bStartX, 530, bW, 46, '◀ MAIN MENU', '#485460', '#FFFFFF', () => {
       this.game.state = 'menu';
+    });
+    this.drawButton(ctx, 'fr_worlds', bStartX + bW + bGap, 530, bW, 46, '🌍 WORLD SELECT', '#00D2FF', '#001A33', () => {
+      this.game.state = 'disasters';
     });
   }
 
@@ -604,21 +1394,21 @@ class UIManager {
     ctx.fillText('HOW TO PLAY', w / 2, 50);
 
     const lines = [
-      '⬆ SPACE / UP ARROW or [JUMP] button : Jump & Double Jump',
-      '⬇ DOWN ARROW or [SLIDE] button : Slide under low hazards',
+      '⬆ SPACE / UP ARROW or [JUMP] : Jump & Double Jump across disaster hazards',
+      '⬇ DOWN ARROW or [SLIDE] : Slide under low debris, icicles & lava arcs',
       '💥 STOMP ENEMIES : Land on enemy heads while falling to squash them!',
-      '🛡️ POWER-UPS : Collect Shields, Magnets, 2X Coins, Speed Boosts & Slow-Mo',
-      '⚠️ SURPRISE DISASTERS : Watch out for meteor showers & rolling boulders!'
+      '🤝 RESCUE FRIENDS : Reach the distance goal in Chapters 1–4 to unlock allies!',
+      '⚡ POWER-UPS & UPGRADES : Collect Shields, Magnets & Boosts, then upgrade in Shop!'
     ];
 
     lines.forEach((line, i) => {
-      ctx.fillStyle = i === 2 ? '#2ED573' : i === 4 ? '#FF4757' : '#E2E8F0';
+      ctx.fillStyle = i === 2 ? '#2ED573' : i === 3 ? '#00F0FF' : i === 4 ? '#FFD32A' : '#E2E8F0';
       ctx.font = '15px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(line, w / 2, 110 + i * 44);
     });
 
-    this.drawButton(ctx, 'guide_back', w / 2 - 70, 375, 140, 42, '⬅ BACK', '#485460', '#FFF', () => {
+    this.drawButton(ctx, 'guide_back', w / 2 - 75, 375, 150, 44, '⬅ BACK', '#485460', '#FFF', () => {
       this.game.state = 'menu';
     });
   }
@@ -626,127 +1416,154 @@ class UIManager {
   drawDisasterExpeditions(ctx) {
     const w = this.game.width;
     const h = this.game.height;
-    const story = this.game.storage.data.story || {};
+    const storageMgr = this.game.storage;
+    const story = storageMgr.data.story || {};
     const cards = story.disasterCards || {};
-    const SCRIPT = window.OopsWorld.SCRIPT_DATA || {};
-    const disasterMeta = SCRIPT.DISASTER_CARDS || [];
+    const disasterMeta = window.OopsWorld.CHAPTER_CARDS || [];
 
-    // Dark sleek background
-    ctx.fillStyle = 'rgba(10, 15, 29, 0.96)';
+    // Backdrop
+    ctx.fillStyle = 'rgba(10, 15, 29, 0.97)';
     ctx.fillRect(0, 0, w, h);
 
-    // Subtle star dust particles in background
-    ctx.fillStyle = 'rgba(0, 240, 255, 0.2)';
+    // Subtle background stars
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.22)';
     for (let i = 0; i < 20; i++) {
-      const sx = ((i * 137) % w);
-      const sy = ((i * 73) % h);
+      const sx = (i * 137) % w;
+      const sy = (i * 73) % h;
       ctx.beginPath();
       ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Header
+    // Top Header
     ctx.save();
-    ctx.font = '900 23px sans-serif';
+    ctx.font = '900 22px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#00F0FF';
-    ctx.fillText('OOPS! WORLD — THE GREAT DISASTER', w / 2, 26);
+    ctx.fillText('WORLD SELECTION — SIX DISASTER CHAPTERS', w / 2, 30);
 
+    const clearedPlayable = (story.completedChapters || []).filter((id) =>
+      ['geophysical', 'hydrological', 'meteorological', 'climatological'].includes(id)
+    ).length;
     ctx.font = 'bold 12px sans-serif';
-    ctx.fillStyle = '#A4B0BE';
-    ctx.fillText('Survive all 6 forces of destruction to rescue Bobo’s friends and unlock Part 2: The Hidden Truth', w / 2, 44);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText(
+      `🪙 ${storageMgr.data.totalCoins} Coins   |   Phase 1 Progress: ${clearedPlayable} / 4 Chapters Cleared   |   Select an unlocked zone to rescue Bobo’s friends!`,
+      w / 2,
+      52
+    );
     ctx.restore();
 
-    let completedCount = 0;
-    const cardW = 280;
-    const cardH = 152;
+    // Responsive 3 x 2 Grid of Six Disaster Cards
+    const cols = 3;
+    const gapX = 16;
+    const gapY = 14;
+    const cardW = Math.min(292, Math.floor((w - 56 - gapX * (cols - 1)) / cols));
+    const cardH = 204;
+    const totalW = cols * cardW + (cols - 1) * gapX;
+    const startX = w / 2 - totalW / 2;
+    const startY = 72;
 
     disasterMeta.forEach((meta, idx) => {
-      const col = idx % 3;
-      const row = Math.floor(idx / 3);
-      const cx = 32 + col * 308;
-      const cy = 56 + row * 162;
-      const cardData = cards[meta.id] || { progress: 0, target: 100, completed: false };
-      const isDone = cardData.completed || cardData.progress >= cardData.target;
-      if (isDone) completedCount++;
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      const cx = startX + col * (cardW + gapX);
+      const cy = startY + row * (cardH + gapY);
 
-      // Card Background
+      const cardData = cards[meta.id] || { progress: 0, target: meta.targetDistance, completed: false };
+      const isUnlocked = storageMgr.isChapterUnlocked(meta.id);
+      const isCompleted = storageMgr.isChapterCompleted(meta.id);
+      const isPlayable = meta.playableInPhase1;
+
       ctx.save();
-      ctx.fillStyle = isDone ? 'rgba(18, 38, 48, 0.92)' : 'rgba(16, 24, 40, 0.88)';
+      ctx.fillStyle = isCompleted
+        ? 'rgba(18, 42, 48, 0.94)'
+        : isUnlocked
+        ? 'rgba(16, 24, 42, 0.92)'
+        : 'rgba(12, 16, 28, 0.86)';
       this.roundRect(ctx, cx, cy, cardW, cardH, 12);
       ctx.fill();
 
-      ctx.strokeStyle = isDone ? '#2ED573' : meta.color;
-      ctx.lineWidth = isDone ? 2 : 1.2;
+      ctx.strokeStyle = isCompleted ? '#2ED573' : isUnlocked ? meta.color : '#334155';
+      ctx.lineWidth = isCompleted || isUnlocked ? 1.8 : 1.2;
       this.roundRect(ctx, cx, cy, cardW, cardH, 12);
       ctx.stroke();
 
-      // Card Header
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillStyle = meta.color;
-      ctx.textAlign = 'left';
-      ctx.fillText(`${meta.icon} ${meta.title}`, cx + 12, cy + 22);
+      // Animated 2D Preview Banner
+      const prevH = 66;
+      this.game.chapters.drawCardPreview(
+        ctx,
+        meta.id,
+        cx + 8,
+        cy + 8,
+        cardW - 16,
+        prevH,
+        this.uiTime + idx * 0.8,
+        !isUnlocked || !isPlayable
+      );
 
-      // Status Badge
-      const badgeText = isDone ? '✓ RESCUED' : 'IN PROGRESS';
-      const badgeW = isDone ? 84 : 92;
+      // Status Badge over preview corner
+      const badgeText = isCompleted
+        ? '✅ COMPLETED'
+        : !isPlayable
+        ? isUnlocked
+          ? '🌟 PHASE 2'
+          : '🔒 PHASE 2'
+        : isUnlocked
+        ? '🔓 UNLOCKED'
+        : '🔒 LOCKED';
+      const badgeW = 88;
       const badgeH = 20;
-      const badgeX = cx + cardW - badgeW - 10;
-      const badgeY = cy + 8;
-      ctx.fillStyle = isDone ? '#2ED573' : 'rgba(255, 165, 2, 0.2)';
+      const badgeX = cx + cardW - badgeW - 12;
+      const badgeY = cy + 12;
+
+      ctx.fillStyle = isCompleted
+        ? '#2ED573'
+        : !isPlayable
+        ? 'rgba(15, 23, 42, 0.88)'
+        : isUnlocked
+        ? 'rgba(0, 210, 255, 0.9)'
+        : 'rgba(15, 23, 42, 0.88)';
       this.roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 6);
       ctx.fill();
-      ctx.strokeStyle = isDone ? '#2ED573' : '#FFA502';
-      ctx.lineWidth = 1;
-      this.roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 6);
-      ctx.stroke();
 
-      ctx.fillStyle = isDone ? '#0B2013' : '#FFA502';
-      ctx.font = '900 10px sans-serif';
+      ctx.fillStyle = isCompleted || (isUnlocked && isPlayable) ? '#0B2013' : '#CBD5E1';
+      ctx.font = '900 9px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 14);
+      ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 13);
 
-      // Subtitle / Hazard Description
-      ctx.fillStyle = '#CED6E0';
-      ctx.font = '11px sans-serif';
+      // Card Title & Subtitle
+      ctx.fillStyle = isUnlocked ? meta.color : '#94A3B8';
+      ctx.font = '900 12px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(meta.subtitle, cx + 12, cy + 42);
+      ctx.fillText(`${meta.icon} ${meta.number}. ${meta.title}`, cx + 10, cy + 92);
 
-      ctx.fillStyle = '#747D8C';
+      ctx.fillStyle = '#CBD5E1';
       ctx.font = '10px sans-serif';
-      const shortDesc = meta.description.length > 52 ? meta.description.substring(0, 50) + '...' : meta.description;
-      ctx.fillText(shortDesc, cx + 12, cy + 58);
+      const desc = meta.subtitle.length > 38 ? meta.subtitle.substring(0, 36) + '...' : meta.subtitle;
+      ctx.fillText(desc, cx + 10, cy + 108);
 
-      // Rescued Friend Line
-      ctx.fillStyle = isDone ? '#7BED9F' : '#FFA502';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(`Friend: ${meta.friendName} ${isDone ? '★ SAFE!' : '⏳ Needs rescue'}`, cx + 12, cy + 78);
-
-      // Target text
-      let targetUnit = 'units';
-      if (meta.targetDistance) targetUnit = 'meters survived';
-      else if (meta.targetJumps) targetUnit = 'hazard jumps';
-      else if (meta.targetStorms) targetUnit = 'storm survived';
-      else if (meta.targetCoins) targetUnit = 'energy coins';
-      else if (meta.targetStomps) targetUnit = 'creatures stomped';
-      else if (meta.targetMeteors) targetUnit = 'meteor strike';
-
-      ctx.fillStyle = '#A4B0BE';
-      ctx.font = '10px sans-serif';
-      ctx.fillText(`Target: ${cardData.target} ${targetUnit}`, cx + 12, cy + 96);
+      // Goal & Rewards Line
+      ctx.fillStyle = isCompleted ? '#7BED9F' : '#FFD700';
+      ctx.font = 'bold 10px sans-serif';
+      const goalTxt = isPlayable
+        ? `Goal: ${meta.targetDistance}m · +${meta.rewardCoins} 🪙 · Rescue ${meta.friendName.split(' ')[0]}`
+        : `Goal: ${meta.targetDistance}m · +${meta.rewardCoins} 🪙 · Phase 2`;
+      ctx.fillText(goalTxt, cx + 10, cy + 125);
 
       // Progress bar
-      const barX = cx + 12;
-      const barY = cy + 104;
-      const barW = cardW - 24;
+      const barX = cx + 10;
+      const barY = cy + 133;
+      const barW = cardW - 20;
       const barH = 12;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
       this.roundRect(ctx, barX, barY, barW, barH, 5);
       ctx.fill();
 
-      const fillRatio = Math.max(0, Math.min(1, cardData.progress / cardData.target));
+      const progressVal = isCompleted ? meta.targetDistance : Math.min(meta.targetDistance, cardData.progress || 0);
+      const fillRatio = Math.max(0, Math.min(1, progressVal / meta.targetDistance));
       if (fillRatio > 0) {
-        ctx.fillStyle = isDone ? '#2ED573' : meta.color;
+        ctx.fillStyle = isCompleted ? '#2ED573' : meta.color;
         this.roundRect(ctx, barX, barY, Math.max(8, barW * fillRatio), barH, 5);
         ctx.fill();
       }
@@ -754,111 +1571,53 @@ class UIManager {
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${Math.floor(cardData.progress)} / ${cardData.target}`, barX + barW / 2, barY + 9);
+      ctx.fillText(`${Math.floor(progressVal)}m / ${meta.targetDistance}m`, barX + barW / 2, barY + 9);
 
-      // Motivational Tip
-      ctx.fillStyle = isDone ? '#2ED573' : '#70A1FF';
-      ctx.font = 'italic 10px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(isDone ? '✨ Force overcome! Friend returned to camp.' : '⚡ Keep running to conquer this zone!', cx + 12, cy + 134);
+      // Card CTA Button (min 44px height)
+      const ctaLabel = !isPlayable
+        ? 'COMING IN PHASE 2'
+        : !isUnlocked
+        ? `🔒 CLEAR CH. ${meta.number - 1} FIRST`
+        : isCompleted
+        ? '▶ REPLAY CHAPTER'
+        : '▶ PLAY CHAPTER';
+      const ctaBg = !isPlayable
+        ? '#334155'
+        : !isUnlocked
+        ? '#475569'
+        : isCompleted
+        ? '#2ED573'
+        : meta.color;
+      const ctaTextCol = isCompleted ? '#062010' : '#FFFFFF';
+
+      this.drawButton(ctx, `card_play_${meta.id}`, cx + 10, cy + 153, cardW - 20, 44, ctaLabel, ctaBg, ctaTextCol, () => {
+        this.game.startChapter(meta.id);
+      });
 
       ctx.restore();
     });
 
-    // Card 7 Banner
-    const isPart2Unlocked = story.part2TrailerUnlocked || (completedCount >= 6);
-    const c7X = 32;
-    const c7Y = 388;
-    const c7W = 896;
-    const c7H = 148;
-
-    ctx.save();
-    if (isPart2Unlocked) {
-      // Unlocked
-      ctx.fillStyle = 'rgba(25, 15, 45, 0.94)';
-      this.roundRect(ctx, c7X, c7Y, c7W, c7H, 14);
-      ctx.fill();
-
-      ctx.strokeStyle = '#E056FD';
-      ctx.lineWidth = 2.2;
-      this.roundRect(ctx, c7X, c7Y, c7W, c7H, 14);
-      ctx.stroke();
-
-      ctx.font = '900 17px sans-serif';
-      ctx.fillStyle = '#FFD700';
-      ctx.textAlign = 'left';
-      ctx.fillText('🌟 SEVENTH CARD: PART 2 — THE HIDDEN TRUTH (UNLOCKED)', c7X + 20, c7Y + 28);
-
-      ctx.font = '13px sans-serif';
-      ctx.fillStyle = '#E2E8F0';
-      ctx.fillText('Against all odds, Bobo survived all six disasters and reunited with his friends!', c7X + 20, c7Y + 52);
-
-      ctx.fillStyle = '#A4B0BE';
-      ctx.font = 'italic 12px sans-serif';
-      ctx.fillText('“Some mysteries are better left undiscovered... but some secrets refuse to stay hidden.”', c7X + 20, c7Y + 74);
-
-      this.drawButton(ctx, 'play_trailer_btn', c7X + 20, c7Y + 92, 260, 42, '▶ PLAY PART 2 TRAILER', '#E056FD', '#FFFFFF', () => {
-        this.game.narration.startPart2Trailer();
-      });
-
-      this.drawButton(ctx, 'play_conclusion_btn', c7X + 300, c7Y + 92, 260, 42, '🏆 REPLAY PART 1 CONCLUSION', '#FFA502', '#FFFFFF', () => {
-        this.game.narration.startPart1Conclusion();
-      });
-    } else {
-      // Locked
-      ctx.fillStyle = 'rgba(15, 18, 30, 0.88)';
-      this.roundRect(ctx, c7X, c7Y, c7W, c7H, 14);
-      ctx.fill();
-
-      ctx.strokeStyle = '#485460';
-      ctx.lineWidth = 1.5;
-      this.roundRect(ctx, c7X, c7Y, c7W, c7H, 14);
-      ctx.stroke();
-
-      ctx.font = '900 16px sans-serif';
-      ctx.fillStyle = '#747D8C';
-      ctx.textAlign = 'left';
-      ctx.fillText('🔒 SEVENTH CARD: PART 2 — THE HIDDEN TRUTH (LOCKED)', c7X + 20, c7Y + 30);
-
-      ctx.font = '13px sans-serif';
-      ctx.fillStyle = '#A4B0BE';
-      ctx.fillText(`Rescue Bobo’s friends by completing all 6 disaster cards above (${completedCount}/6 finished).`, c7X + 20, c7Y + 56);
-
-      ctx.fillStyle = '#57606F';
-      ctx.font = 'italic 12px sans-serif';
-      ctx.fillText('Once all 6 zones are conquered, the Part 1 Conclusion and Part 2 Cinematic Trailer will unlock here!', c7X + 20, c7Y + 78);
-
-      // Lock Badge
-      ctx.fillStyle = 'rgba(255, 71, 87, 0.15)';
-      this.roundRect(ctx, c7X + c7W - 220, c7Y + 38, 200, 64, 10);
-      ctx.fill();
-      ctx.strokeStyle = '#FF4757';
-      ctx.lineWidth = 1;
-      this.roundRect(ctx, c7X + c7W - 220, c7Y + 38, 200, 64, 10);
-      ctx.stroke();
-
-      ctx.fillStyle = '#FF4757';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`🔒 ${6 - completedCount} MORE TO UNLOCK`, c7X + c7W - 120, c7Y + 65);
-      ctx.font = '11px sans-serif';
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(`${completedCount} of 6 Completed`, c7X + c7W - 120, c7Y + 84);
-    }
-    ctx.restore();
-
     // Bottom Navigation Bar
-    const bY = 550;
-    this.drawButton(ctx, 'story_back_btn', 32, bY, 150, 44, '◀ MAIN MENU', '#485460', '#FFFFFF', () => {
+    const navY = 516;
+    const navW = Math.min(195, Math.floor((w - 84) / 4));
+    const navGap = 14;
+    const navTotal = navW * 4 + navGap * 3;
+    const navX = w / 2 - navTotal / 2;
+
+    this.drawButton(ctx, 'story_back_btn', navX, navY, navW, 48, '◀ MAIN MENU', '#485460', '#FFFFFF', () => {
       this.game.state = 'menu';
     });
 
-    this.drawButton(ctx, 'story_cinematic_btn', 200, bY, 320, 44, '🎬 REPLAY OPENING CINEMATIC (1–7)', '#00D2FF', '#001A33', () => {
-      this.game.narration.startOpeningCinematic(false);
+    this.drawButton(ctx, 'story_friends_btn', navX + (navW + navGap), navY, navW, 48, '🏕 RESCUED FRIENDS', '#10AC84', '#FFFFFF', () => {
+      this.game.state = 'friends_collection';
     });
 
-    this.drawButton(ctx, 'story_run_btn', 540, bY, 200, 44, '▶ START EXPEDITION', '#2ED573', '#FFFFFF', () => {
-      this.game.startPlaying();
+    this.drawButton(ctx, 'story_upgrades_btn', navX + (navW + navGap) * 2, navY, navW, 48, '⚡ UPGRADES', '#FF6B35', '#FFFFFF', () => {
+      this.game.state = 'upgrades';
+    });
+
+    this.drawButton(ctx, 'story_cinematic_btn', navX + (navW + navGap) * 3, navY, navW, 48, '🎬 REPLAY INTRO', '#00D2FF', '#001A33', () => {
+      this.game.narration.startOpeningCinematic(false);
     });
   }
 

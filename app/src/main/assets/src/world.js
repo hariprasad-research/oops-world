@@ -61,15 +61,30 @@ class World {
     this.chunks = [];
     this.props = [];
 
-    const themeId = this.game.storage?.data?.selectedTheme || 'forest';
-    this.theme = (THEMES && THEMES.find((t) => t.id === themeId)) || (THEMES ? THEMES[0] : {
-      id: 'forest',
-      name: 'Green Haven',
-      skyTop: '#4FACFE',
-      skyBottom: '#00F2FE',
-      groundColor: '#43A047',
-      groundUnder: '#2E7D32'
-    });
+    const ch = this.game.activeChapter;
+    if (ch) {
+      this.theme = {
+        id: ch.id,
+        name: ch.title,
+        skyTop: ch.bgTop,
+        skyBottom: ch.bgBot,
+        groundColor: ch.groundColor,
+        groundUnder: ch.groundUnder
+      };
+      if (ch.id === 'hydrological') this.weather = 'rain';
+      else if (ch.id === 'meteorological') this.weather = 'storm';
+      else this.weather = 'clear';
+    } else {
+      const themeId = this.game.storage?.data?.selectedTheme || 'forest';
+      this.theme = (THEMES && THEMES.find((t) => t.id === themeId)) || (THEMES ? THEMES[0] : {
+        id: 'forest',
+        name: 'Green Haven',
+        skyTop: '#4FACFE',
+        skyBottom: '#00F2FE',
+        groundColor: '#43A047',
+        groundUnder: '#2E7D32'
+      });
+    }
 
     let curX = 0;
     for (let i = 0; i < 6; i++) {
@@ -126,7 +141,16 @@ class World {
     }
 
     this.weatherTimer -= dt;
-    if (this.weatherTimer <= 0) {
+    if (this.game.activeChapter) {
+      const chId = this.game.activeChapter.id;
+      if (chId === 'meteorological') this.weather = 'storm';
+      else if (chId === 'hydrological') this.weather = 'rain';
+      else if (chId === 'climatological') {
+        this.weather = this.game.chapters?.climateMode === 'freeze' ? 'snow' : 'clear';
+      } else {
+        this.weather = 'clear';
+      }
+    } else if (this.weatherTimer <= 0) {
       const weathers = ['clear', 'rain', 'snow', 'storm'];
       this.weather = Utils.randChoice(weathers);
       this.weatherTimer = Utils.randFloat(25, 45);
@@ -241,7 +265,21 @@ class World {
     const cycle = (Math.sin(this.worldTime) + 1) / 2;
     const grad = ctx.createLinearGradient(0, 0, 0, this.game.height);
 
-    if (this.theme.id === 'cosmic') {
+    if (this.theme.id === 'climatological') {
+      const mix = this.game.chapters?.climateMix || 0;
+      if (mix > 0.5) {
+        grad.addColorStop(0, '#0B2545');
+        grad.addColorStop(0.6, '#1D4E89');
+        grad.addColorStop(1, '#74C0FC');
+      } else {
+        grad.addColorStop(0, '#5E1904');
+        grad.addColorStop(0.55, '#C04810');
+        grad.addColorStop(1, '#F39C12');
+      }
+    } else if (this.game.activeChapter) {
+      grad.addColorStop(0, this.theme.skyTop);
+      grad.addColorStop(1, this.theme.skyBottom);
+    } else if (this.theme.id === 'cosmic') {
       grad.addColorStop(0, '#0F051D');
       grad.addColorStop(0.6, '#280A3C');
       grad.addColorStop(1, '#4A154B');
@@ -340,7 +378,21 @@ class World {
     const h = this.game.height;
 
     ctx.save();
-    ctx.fillStyle = this.theme.id === 'desert' ? '#E67E22' : this.theme.id === 'snow' ? '#74B9FF' : '#27AE60';
+    const isFreeze = this.theme.id === 'climatological' && (this.game.chapters?.climateMix || 0) > 0.5;
+    ctx.fillStyle =
+      this.theme.id === 'geophysical'
+        ? '#7B241C'
+        : this.theme.id === 'hydrological'
+        ? '#144272'
+        : this.theme.id === 'meteorological'
+        ? '#2C2540'
+        : isFreeze
+        ? '#74B9FF'
+        : this.theme.id === 'climatological' || this.theme.id === 'desert'
+        ? '#E67E22'
+        : this.theme.id === 'snow'
+        ? '#74B9FF'
+        : '#27AE60';
     ctx.globalAlpha = 0.35;
 
     ctx.beginPath();
@@ -357,8 +409,40 @@ class World {
     ctx.fill();
     ctx.restore();
 
+    // Chapter-specific far background volcano peak (Ch 1)
+    if (this.theme.id === 'geophysical') {
+      ctx.save();
+      const vx = w * 0.72;
+      ctx.fillStyle = 'rgba(40, 14, 10, 0.72)';
+      ctx.beginPath();
+      ctx.moveTo(vx - 150, h * 0.75);
+      ctx.lineTo(vx - 30, h * 0.25);
+      ctx.lineTo(vx + 30, h * 0.25);
+      ctx.lineTo(vx + 165, h * 0.75);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 87, 34, 0.85)';
+      ctx.beginPath();
+      ctx.arc(vx, h * 0.25, 22 + Math.sin(this.worldTime * 35) * 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     ctx.save();
-    ctx.fillStyle = this.theme.id === 'desert' ? '#D35400' : this.theme.id === 'snow' ? '#0984E3' : '#1E824C';
+    ctx.fillStyle =
+      this.theme.id === 'geophysical'
+        ? '#4A2311'
+        : this.theme.id === 'hydrological'
+        ? '#1B4965'
+        : this.theme.id === 'meteorological'
+        ? '#181424'
+        : isFreeze
+        ? '#0984E3'
+        : this.theme.id === 'climatological' || this.theme.id === 'desert'
+        ? '#D35400'
+        : this.theme.id === 'snow'
+        ? '#0984E3'
+        : '#1E824C';
     ctx.globalAlpha = 0.55;
 
     ctx.beginPath();
@@ -377,26 +461,53 @@ class World {
 
   drawTerrain(ctx) {
     const bottomY = this.game.height + 40;
+    const isFreeze = this.theme.id === 'climatological' && (this.game.chapters?.climateMix || 0) > 0.5;
+    const activeGroundColor = isFreeze ? '#A5F3FC' : this.theme.groundColor;
+    const activeGroundUnder = isFreeze ? '#38BDF8' : this.theme.groundUnder;
 
     for (let i = 0; i < this.chunks.length; i++) {
       const c = this.chunks[i];
       if (c.isGap) {
-        ctx.fillStyle = '#111116';
+        ctx.fillStyle = this.theme.id === 'geophysical' ? '#3B0D06' : this.theme.id === 'hydrological' ? '#0A2E47' : '#111116';
         ctx.fillRect(c.x, c.y, c.width, bottomY - c.y);
 
-        ctx.fillStyle = 'rgba(235, 77, 75, 0.4)';
-        ctx.fillRect(c.x, bottomY - 30, c.width, 30);
+        ctx.fillStyle =
+          this.theme.id === 'geophysical'
+            ? 'rgba(255, 87, 34, 0.78)'
+            : this.theme.id === 'hydrological'
+            ? 'rgba(0, 168, 255, 0.6)'
+            : 'rgba(235, 77, 75, 0.4)';
+        ctx.fillRect(c.x, bottomY - 36, c.width, 36);
         continue;
       }
 
       ctx.save();
-      ctx.fillStyle = this.theme.groundUnder;
+      ctx.fillStyle = activeGroundUnder;
       ctx.fillRect(c.x, c.y, c.width, bottomY - c.y);
 
-      ctx.fillStyle = this.theme.groundColor;
+      ctx.fillStyle = activeGroundColor;
       ctx.fillRect(c.x, c.y, c.width, 16);
 
-      ctx.fillStyle = this.theme.groundColor;
+      // Chapter 1: Glowing magma cracks inside soil band
+      if (this.theme.id === 'geophysical') {
+        ctx.strokeStyle = 'rgba(255, 87, 34, 0.7)';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(c.x + 28, c.y + 4);
+        ctx.lineTo(c.x + 56, c.y + 38);
+        ctx.lineTo(c.x + 44, c.y + 72);
+        ctx.stroke();
+      } else if (this.theme.id === 'climatological' && !isFreeze) {
+        // Dry drought cracks
+        ctx.strokeStyle = '#3B180A';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(c.x + 40, c.y + 2);
+        ctx.lineTo(c.x + 60, c.y + 32);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = activeGroundColor;
       for (let bx = c.x; bx < c.x + c.width; bx += 14) {
         ctx.beginPath();
         ctx.arc(bx + 7, c.y + 16, 5, 0, Math.PI);
@@ -410,10 +521,10 @@ class World {
       if (c.platform) {
         const p = c.platform;
         ctx.save();
-        ctx.fillStyle = this.theme.groundUnder;
+        ctx.fillStyle = activeGroundUnder;
         ctx.fillRect(p.x, p.y + 5, p.width, p.height - 5);
 
-        ctx.fillStyle = this.theme.groundColor;
+        ctx.fillStyle = activeGroundColor;
         ctx.fillRect(p.x, p.y, p.width, 7);
 
         ctx.strokeStyle = '#2C3E50';

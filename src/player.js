@@ -63,13 +63,20 @@ class Player {
     this.runCycle = 0;
 
     // Active powerups
+    const s = this.game.storage;
     this.powerups = {
       shield: false,
+      shieldTimer: 0,
+      shieldMax: s?.getPowerupDuration('shield') || 8,
       magnetTimer: 0,
+      magnetMax: s?.getPowerupDuration('magnet') || 11,
       magnetRadius: 240,
       speedTimer: 0,
+      speedMax: s?.getPowerupDuration('speed') || 6.5,
       doubleCoinsTimer: 0,
-      slowMoTimer: 0
+      doubleCoinsMax: s?.getPowerupDuration('double_coins') || 12,
+      slowMoTimer: 0,
+      slowMoMax: s?.getPowerupDuration('slow_mo') || 7
     };
 
     // Facial expressions
@@ -78,12 +85,17 @@ class Player {
     this.isBlinking = false;
     this.sweatTimer = 0;
 
-    this.applyCharacterTraits();
+    this.applyCharacterTraits(true);
   }
 
-  applyCharacterTraits() {
+  applyCharacterTraits(isRunStart = false) {
     const charId = this.game.storage?.data?.selectedCharacter || 'bobo';
     this.characterId = charId;
+
+    this.maxSlideDuration = 0.55;
+    this.jumpStrength = -580;
+    this.powerups.magnetRadius = 240;
+    this.powerupDurationMultiplier = 1.0;
 
     if (charId === 'pip') {
       this.maxSlideDuration = 0.72;
@@ -91,8 +103,13 @@ class Player {
       this.jumpStrength = -640;
     } else if (charId === 'gloop') {
       this.powerups.magnetRadius = 320;
-    } else if (charId === 'robo') {
+    } else if (charId === 'robo' && isRunStart) {
+      const miniDur = Math.max(5, (this.game.storage?.getPowerupDuration('shield') || 8) * 0.65);
       this.powerups.shield = true;
+      this.powerups.shieldTimer = miniDur;
+      this.powerups.shieldMax = miniDur;
+    } else if (charId === 'starlight') {
+      this.powerupDurationMultiplier = 1.25;
     }
   }
 
@@ -129,8 +146,6 @@ class Player {
       this.scaleX = 0.75;
       this.scaleY = 1.35;
 
-      this.game.storage?.updateDisasterProgress('hydrological', 1);
-
       this.game.particles.dustPuff(this.x, this.y, 6);
       this.game.audio.playJump();
       return true;
@@ -140,8 +155,6 @@ class Player {
       this.hasDoubleJumped = true;
       this.state = PLAYER_STATES.DOUBLE_JUMPING;
       this.spinRotation = 0;
-
-      this.game.storage?.updateDisasterProgress('hydrological', 1);
 
       this.game.particles.burst(this.x, this.y - 20, 10, {
         color: '#00F0FF',
@@ -190,6 +203,7 @@ class Player {
 
     if (this.powerups.shield) {
       this.powerups.shield = false;
+      this.powerups.shieldTimer = 0;
       this.invincibleTimer = 1.0;
       this.game.camera.addTrauma(0.4);
       this.game.particles.burst(this.x, this.y - 25, 14, {
@@ -263,6 +277,13 @@ class Player {
       this.sweatTimer -= dt;
     }
 
+    if (this.powerups.shield && this.powerups.shieldTimer > 0) {
+      this.powerups.shieldTimer -= dt;
+      if (this.powerups.shieldTimer <= 0) {
+        this.powerups.shield = false;
+        this.powerups.shieldTimer = 0;
+      }
+    }
     if (this.powerups.magnetTimer > 0) {
       this.powerups.magnetTimer -= dt;
       if (Math.random() < 0.25) {
@@ -408,6 +429,8 @@ class Player {
       this.drawGloop(ctx, isSliding, isJumping, isFalling);
     } else if (charId === 'robo') {
       this.drawRobo(ctx, isSliding, isJumping, isFalling);
+    } else if (charId === 'starlight') {
+      this.drawStarlight(ctx, isSliding, isJumping, isFalling);
     } else {
       this.drawBobo(ctx, isSliding, isJumping, isFalling);
     }
@@ -665,6 +688,69 @@ class Player {
 
     ctx.fillStyle = '#2ED573';
     ctx.fillRect(-12, -10, 24, 7);
+
+    ctx.restore();
+  }
+
+  drawStarlight(ctx, isSliding, isJumping, isFalling) {
+    const bobY = isSliding ? 0 : Math.sin(this.runCycle) * 3;
+    const bodyCenterY = isSliding ? -14 : -22 + bobY;
+    const capeWave = Math.sin(this.runCycle * 1.6) * 4;
+
+    ctx.save();
+    ctx.translate(0, bodyCenterY);
+
+    // Flowing cosmic starlight cape
+    ctx.fillStyle = '#FFEAA7';
+    ctx.strokeStyle = '#E1B12C';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-10, -8);
+    ctx.quadraticCurveTo(-24, -4 + capeWave, -28, 12 + capeWave * 0.6);
+    ctx.lineTo(-10, 14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Cosmic aura body
+    const grad = ctx.createRadialGradient(-5, -6, 3, 0, 0, 21);
+    grad.addColorStop(0, '#D980FA');
+    grad.addColorStop(0.55, '#A55EEA');
+    grad.addColorStop(1, '#5F27CD');
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = '#2C0E5E';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, isSliding ? 25 : 19, isSliding ? 12 : 19, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Golden 4-point star crest on top
+    if (!isSliding) {
+      ctx.fillStyle = '#FFD700';
+      ctx.strokeStyle = '#B8860B';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(0, -31);
+      ctx.lineTo(3.5, -23);
+      ctx.lineTo(10, -21);
+      ctx.lineTo(3.5, -18.5);
+      ctx.lineTo(0, -12);
+      ctx.lineTo(-3.5, -18.5);
+      ctx.lineTo(-10, -21);
+      ctx.lineTo(-3.5, -23);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Chest starlight emblem
+    ctx.fillStyle = '#FFEAA7';
+    ctx.beginPath();
+    ctx.arc(0, 10, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    this.drawEyes(ctx, isSliding, isJumping, isFalling);
 
     ctx.restore();
   }

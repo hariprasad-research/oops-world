@@ -82,7 +82,6 @@ class Collectible {
         const multiplier = player.powerups.doubleCoinsTimer > 0 ? 2 : 1;
         this.game.coinsCollected += 1 * multiplier;
         this.game.score += 25 * multiplier;
-        this.game.storage?.updateDisasterProgress('climatological', 1 * multiplier);
         this.game.particles.coinSparkle(this.x, this.y);
         this.game.audio.playCoin();
         break;
@@ -91,7 +90,6 @@ class Collectible {
         const multiplier = player.powerups.doubleCoinsTimer > 0 ? 2 : 1;
         this.game.coinsCollected += 5 * multiplier;
         this.game.score += 150 * multiplier;
-        this.game.storage?.updateDisasterProgress('climatological', 3 * multiplier);
         this.game.particles.burst(this.x, this.y, 14, {
           color: '#FF3366',
           shape: 'star',
@@ -101,8 +99,11 @@ class Collectible {
         this.game.audio.playGem();
         break;
       }
-      case ITEM_TYPES.SHIELD:
+      case ITEM_TYPES.SHIELD: {
+        const dur = (this.game.storage?.getPowerupDuration('shield') || 8) * (player.powerupDurationMultiplier || 1);
         player.powerups.shield = true;
+        player.powerups.shieldTimer = dur;
+        player.powerups.shieldMax = dur;
         this.game.particles.burst(this.x, this.y, 16, {
           color: '#00F0FF',
           shape: 'ring',
@@ -112,8 +113,11 @@ class Collectible {
         this.game.audio.playPowerup();
         this.game.hudToast('SHIELD ACTIVATED! 🛡️', '#00F0FF');
         break;
-      case ITEM_TYPES.MAGNET:
-        player.powerups.magnetTimer = 11;
+      }
+      case ITEM_TYPES.MAGNET: {
+        const dur = (this.game.storage?.getPowerupDuration('magnet') || 11) * (player.powerupDurationMultiplier || 1);
+        player.powerups.magnetTimer = dur;
+        player.powerups.magnetMax = dur;
         this.game.particles.burst(this.x, this.y, 14, {
           color: '#FFD700',
           shape: 'circle',
@@ -123,8 +127,11 @@ class Collectible {
         this.game.audio.playPowerup();
         this.game.hudToast('COIN MAGNET! 🧲', '#FFD700');
         break;
-      case ITEM_TYPES.SPEED:
-        player.powerups.speedTimer = 6.5;
+      }
+      case ITEM_TYPES.SPEED: {
+        const dur = (this.game.storage?.getPowerupDuration('speed') || 6.5) * (player.powerupDurationMultiplier || 1);
+        player.powerups.speedTimer = dur;
+        player.powerups.speedMax = dur;
         this.game.particles.burst(this.x, this.y, 20, {
           color: '#FF4757',
           shape: 'star',
@@ -134,8 +141,11 @@ class Collectible {
         this.game.audio.playSpeedBoost();
         this.game.hudToast('HYPER SPEED BOOST! ⚡', '#FF4757');
         break;
-      case ITEM_TYPES.DOUBLE_COINS:
-        player.powerups.doubleCoinsTimer = 12;
+      }
+      case ITEM_TYPES.DOUBLE_COINS: {
+        const dur = (this.game.storage?.getPowerupDuration('double_coins') || 12) * (player.powerupDurationMultiplier || 1);
+        player.powerups.doubleCoinsTimer = dur;
+        player.powerups.doubleCoinsMax = dur;
         this.game.particles.burst(this.x, this.y, 14, {
           color: '#FFA502',
           shape: 'star',
@@ -145,6 +155,7 @@ class Collectible {
         this.game.audio.playPowerup();
         this.game.hudToast('DOUBLE COINS (2X)! 🪙', '#FFA502');
         break;
+      }
       case ITEM_TYPES.HEALTH:
         if (player.heal(1)) {
           this.game.hudToast('+1 HEALTH RESTORED! ❤️', '#FF4757');
@@ -153,8 +164,10 @@ class Collectible {
           this.game.hudToast('MAX HEALTH BONUS! ⭐', '#FFD700');
         }
         break;
-      case ITEM_TYPES.SLOW_MO:
-        player.powerups.slowMoTimer = 7;
+      case ITEM_TYPES.SLOW_MO: {
+        const dur = (this.game.storage?.getPowerupDuration('slow_mo') || 7) * (player.powerupDurationMultiplier || 1);
+        player.powerups.slowMoTimer = dur;
+        player.powerups.slowMoMax = dur;
         this.game.particles.burst(this.x, this.y, 14, {
           color: '#70A1FF',
           shape: 'circle',
@@ -164,6 +177,7 @@ class Collectible {
         this.game.audio.playPowerup();
         this.game.hudToast('SLOW MOTION! ⏱️', '#70A1FF');
         break;
+      }
     }
   }
 
@@ -392,16 +406,21 @@ class PowerupManager {
   update(dt, worldSpeed) {
     const Utils = window.OopsWorld.Utils;
 
-    this.coinSpawnTimer -= dt;
-    if (this.coinSpawnTimer <= 0) {
-      this.spawnCoinPattern();
-      this.coinSpawnTimer = Utils.randFloat(1.2, 2.5);
-    }
+    const activeCh = this.game.activeChapter;
+    const nearChapterEnd = activeCh && this.game.world.distance >= activeCh.targetDistance - 16;
 
-    this.powerupSpawnTimer -= dt;
-    if (this.powerupSpawnTimer <= 0) {
-      this.spawnRandomPowerup();
-      this.powerupSpawnTimer = Utils.randFloat(16, 26);
+    if (!nearChapterEnd) {
+      this.coinSpawnTimer -= dt;
+      if (this.coinSpawnTimer <= 0) {
+        this.spawnCoinPattern();
+        this.coinSpawnTimer = Utils.randFloat(1.2, 2.5);
+      }
+
+      this.powerupSpawnTimer -= dt;
+      if (this.powerupSpawnTimer <= 0) {
+        this.spawnRandomPowerup();
+        this.powerupSpawnTimer = Utils.randFloat(16, 26);
+      }
     }
 
     for (let i = this.items.length - 1; i >= 0; i--) {
