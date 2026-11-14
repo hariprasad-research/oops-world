@@ -169,7 +169,42 @@ class ChapterDirector {
     this.introTimer = 0;
   }
 
+  getFinalTrialMeta() {
+    return {
+      id: 'final_trial',
+      number: 7,
+      title: 'FINAL DISASTER TRIAL',
+      shortName: 'FINAL TRIAL',
+      subtitle: 'Combined Multi-Disaster Gauntlet',
+      description: 'Debug gauntlet combining volcanic, flood, storm, frost, bio & space hazards.',
+      targetDistance: 300,
+      rewardCoins: 1000,
+      friendId: 'starlight',
+      friendName: 'All Allies',
+      icon: '⚔️',
+      color: '#FF4757',
+      bgTop: '#100422',
+      bgMid: '#360940',
+      bgBot: '#8E1E4A',
+      groundColor: '#5F27CD',
+      groundUnder: '#2C0E5E',
+      playableInPhase1: false,
+      isFinalTrial: true,
+      introLine: '“The Final Trial begins! Survive every disaster colliding at once!”',
+      rescueLine: '“FINAL TRIAL CONQUERED! Every disaster mastered and all allies united!”'
+    };
+  }
+
+  resolveDisplayFriendId(ch) {
+    if (!ch) return 'bobo';
+    if (ch.friendId) return ch.friendId;
+    if (ch.id === 'biological') return 'gloop';
+    if (ch.id === 'extraterrestrial' || ch.id === 'final_trial') return 'starlight';
+    return 'bobo';
+  }
+
   getCardMeta(chapterId) {
+    if (chapterId === 'final_trial') return this.getFinalTrialMeta();
     return CHAPTER_CARDS.find((c) => c.id === chapterId) || CHAPTER_CARDS[0];
   }
 
@@ -217,7 +252,15 @@ class ChapterDirector {
     this.game.player.invincibleTimer = 0;
 
     const chapterId = this.activeChapter.id;
-    const outcome = this.game.storage.completeChapter(chapterId);
+    const outcome =
+      chapterId === 'final_trial'
+        ? {
+            firstCompletion: true,
+            coinsAwarded: this.activeChapter.rewardCoins || 1000,
+            rescuedFriendId: 'starlight',
+            unlockedChapterId: null
+          }
+        : this.game.storage.completeChapter(chapterId);
     // Also record distance/run coins earned so far!
     this.game.storage.recordRun({
       score: this.game.score,
@@ -225,7 +268,7 @@ class ChapterDirector {
       coins: this.game.coinsCollected,
       enemiesStomped: this.game.enemiesStomped,
       disastersSurvived: this.game.disastersSurvived + 1,
-      chapterId
+      chapterId: chapterId === 'final_trial' ? null : chapterId
     });
     this.rescueOutcome = outcome;
     this.game.state = 'chapter_rescue';
@@ -273,6 +316,13 @@ class ChapterDirector {
       this.updateMeteorologicalEnvironment(dt, diff);
     } else if (chId === 'climatological') {
       this.updateClimatologicalEnvironment(dt, dist, diff);
+    } else if (chId === 'final_trial') {
+      this.updateGeophysicalEnvironment(dt, diff);
+    }
+
+    if (this.game.debug?.shouldDisableObstacles()) {
+      this.hazards = [];
+      return;
     }
 
     // Spawn dynamic chapter hazards (pause spawning near rescue finish line so landing is clear)
@@ -519,6 +569,55 @@ class ChapterDirector {
           });
         }
       }
+    } else if (chId === 'biological') {
+      if (Math.random() < 0.55) {
+        this.hazards.push({
+          type: 'toxic_spore',
+          x: w + 80,
+          y: groundY - 48,
+          baseY: groundY - 48,
+          radius: 20,
+          phase: Math.random() * Math.PI * 2,
+          speed: 110 + diff * 60,
+          active: true
+        });
+      } else {
+        this.hazards.push({
+          type: 'mutated_vine',
+          x: w + 70,
+          y: groundY,
+          width: 44,
+          height: 44,
+          active: true
+        });
+      }
+    } else if (chId === 'extraterrestrial') {
+      if (Math.random() < 0.6) {
+        this.hazards.push({
+          type: 'cosmic_meteor',
+          x: this.game.player.x + 300 + Math.random() * 220,
+          y: -45,
+          targetY: groundY,
+          vx: -140,
+          vy: 390 + diff * 130,
+          radius: 19,
+          active: true
+        });
+      } else {
+        this.hazards.push({
+          type: 'gravity_rift',
+          x: w + 80,
+          y: groundY - 42,
+          radius: 22,
+          spin: 0,
+          speed: 140 + diff * 70,
+          active: true
+        });
+      }
+    } else if (chId === 'final_trial') {
+      const subChapters = ['geophysical', 'hydrological', 'meteorological', 'climatological', 'biological', 'extraterrestrial'];
+      const picked = subChapters[Math.floor(Math.random() * subChapters.length)];
+      this.spawnChapterHazard(picked, Math.min(1, diff + 0.25));
     }
   }
 
@@ -666,6 +765,55 @@ class ChapterDirector {
         h.x -= worldSpeed * dt;
         const box = { x: h.x - h.width / 2, y: h.y - h.height, width: h.width, height: h.height - h.clearanceY };
         if (Utils.rectIntersect(box, player.hitbox)) {
+          if (player.powerups.speedTimer > 0) {
+            h.active = false;
+          } else {
+            player.takeDamage(1);
+          }
+        }
+      } else if (h.type === 'toxic_spore') {
+        h.x -= (worldSpeed + h.speed) * dt;
+        h.phase += dt * 4;
+        h.y = h.baseY + Math.sin(h.phase) * 24;
+        if (Utils.circleRectIntersect({ x: h.x, y: h.y, radius: h.radius }, player.hitbox)) {
+          if (player.powerups.speedTimer > 0) {
+            h.active = false;
+          } else {
+            player.takeDamage(1);
+          }
+        }
+      } else if (h.type === 'mutated_vine') {
+        h.x -= worldSpeed * dt;
+        const box = { x: h.x - h.width / 2, y: h.y - h.height, width: h.width, height: h.height };
+        if (Utils.rectIntersect(box, player.hitbox)) {
+          if (player.powerups.speedTimer > 0) {
+            h.active = false;
+          } else {
+            player.takeDamage(1);
+          }
+        }
+      } else if (h.type === 'cosmic_meteor') {
+        h.x += (h.vx - worldSpeed * 0.4) * dt;
+        h.y += h.vy * dt;
+        const g = this.game.world.getGroundAt(h.x);
+        if (h.y >= (g.y || h.targetY) - 6) {
+          this.game.particles.explosion(h.x, g.y || h.targetY);
+          h.active = false;
+          continue;
+        }
+        if (Utils.circleRectIntersect({ x: h.x, y: h.y, radius: h.radius }, player.hitbox)) {
+          if (player.powerups.speedTimer > 0) {
+            h.active = false;
+          } else {
+            player.takeDamage(1);
+            h.active = false;
+          }
+          continue;
+        }
+      } else if (h.type === 'gravity_rift') {
+        h.x -= (worldSpeed + h.speed) * dt;
+        h.spin += dt * 7;
+        if (Utils.circleRectIntersect({ x: h.x, y: h.y, radius: h.radius }, player.hitbox)) {
           if (player.powerups.speedTimer > 0) {
             h.active = false;
           } else {
@@ -896,6 +1044,51 @@ class ChapterDirector {
         ctx.font = 'bold 10px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('SLIDE ⬇', h.x, h.y - 16);
+      } else if (h.type === 'toxic_spore') {
+        ctx.fillStyle = 'rgba(46, 213, 115, 0.85)';
+        ctx.strokeStyle = '#1E824C';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#A8FF78';
+        ctx.beginPath();
+        ctx.arc(h.x - 5, h.y - 5, 5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (h.type === 'mutated_vine') {
+        ctx.fillStyle = '#2ED573';
+        ctx.strokeStyle = '#145A32';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(h.x - 18, h.y);
+        ctx.lineTo(h.x - 8, h.y - h.height);
+        ctx.lineTo(h.x + 2, h.y - h.height * 0.65);
+        ctx.lineTo(h.x + 12, h.y - h.height * 0.9);
+        ctx.lineTo(h.x + 20, h.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else if (h.type === 'cosmic_meteor') {
+        ctx.fillStyle = '#A55EEA';
+        ctx.strokeStyle = '#FFEAA7';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (h.type === 'gravity_rift') {
+        ctx.translate(h.x, h.y);
+        ctx.rotate(h.spin);
+        ctx.strokeStyle = '#A55EEA';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, h.radius, 0, Math.PI * 1.5);
+        ctx.stroke();
+        ctx.fillStyle = '#5F27CD';
+        ctx.beginPath();
+        ctx.arc(0, 0, h.radius * 0.55, 0, Math.PI * 2);
+        ctx.fill();
       }
       ctx.restore();
     }
@@ -908,11 +1101,11 @@ class ChapterDirector {
     ctx.fillStyle = 'rgba(46, 213, 115, 0.28)';
     ctx.fillRect(-26, -320, 52, 320);
     // Friend waiting!
-    this.drawFriendSprite(ctx, ch.friendId, 0, 0, this.time, true);
+    this.drawFriendSprite(ctx, this.resolveDisplayFriendId(ch), 0, 0, this.time, true);
     ctx.fillStyle = '#2ED573';
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`RESCUE ${ch.friendName.toUpperCase()}!`, 0, -72);
+    ctx.fillText(ch.id === 'final_trial' ? 'FINAL TRIAL GOAL!' : `RESCUE ${ch.friendName.toUpperCase()}!`, 0, -72);
     ctx.restore();
   }
 
@@ -952,7 +1145,7 @@ class ChapterDirector {
     ctx.save();
     ctx.translate(w * 0.72, 268);
     ctx.scale(1.45, 1.45);
-    this.drawFriendSprite(ctx, ch.friendId, 0, 0, this.introTimer, true);
+    this.drawFriendSprite(ctx, this.resolveDisplayFriendId(ch), 0, 0, this.introTimer, true);
     ctx.restore();
 
     // Story Card Panel
@@ -1031,18 +1224,28 @@ class ChapterDirector {
     ctx.save();
     ctx.translate(w / 2 + 58, 270);
     ctx.scale(1.45, 1.45);
-    this.drawFriendSprite(ctx, ch.friendId, 0, 0, this.rescueAnimTimer, false);
+    this.drawFriendSprite(ctx, this.resolveDisplayFriendId(ch), 0, 0, this.rescueAnimTimer, false);
     ctx.restore();
 
     // Header
     ctx.fillStyle = '#2ED573';
-    ctx.font = '900 30px sans-serif';
+    ctx.font = '900 28px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`🎉 FRIEND RESCUED: ${ch.friendName.toUpperCase()}! 🎉`, w / 2, 65);
+    if (ch.id === 'final_trial') {
+      ctx.fillText('⚔️ FINAL DISASTER TRIAL COMPLETED! ⚔️', w / 2, 65);
+    } else if (this.game.debug?.debugCompletionBanner) {
+      ctx.fillText(`🏁 COMPLETION SEQUENCE: ${ch.friendName.toUpperCase()}!`, w / 2, 65);
+    } else {
+      ctx.fillText(`🎉 FRIEND RESCUED: ${ch.friendName.toUpperCase()}! 🎉`, w / 2, 65);
+    }
 
     ctx.fillStyle = '#FFD700';
     ctx.font = 'bold 16px sans-serif';
-    ctx.fillText(`CHAPTER ${ch.number} (${ch.title}) COMPLETED!`, w / 2, 98);
+    ctx.fillText(
+      ch.id === 'final_trial' ? `${ch.title} — MASTERED!` : `CHAPTER ${ch.number} (${ch.title}) COMPLETED!`,
+      w / 2,
+      98
+    );
 
     // Summary card
     const boxW = Math.min(640, w - 64);
@@ -1058,23 +1261,31 @@ class ChapterDirector {
 
     ctx.fillStyle = '#FFFDF7';
     ctx.font = 'italic bold 15px sans-serif';
-    ctx.fillText(ch.rescueLine, w / 2, boxY + 34);
+    ctx.fillText(
+      ch.rescueLine || `“${ch.title} cleared cleanly in Debug Testing mode!”`,
+      w / 2,
+      boxY + 34
+    );
 
     ctx.fillStyle = '#FFD700';
     ctx.font = 'bold 17px sans-serif';
-    ctx.fillText(`🪙 Reward Earned: +${outcome.coinsAwarded} Coins  |  👥 ${ch.friendName} Unlocked for Play!`, w / 2, boxY + 72);
+    ctx.fillText(`🪙 Reward Earned: +${outcome.coinsAwarded} Coins  |  👥 ${ch.friendName} Ready for Play!`, w / 2, boxY + 72);
 
     ctx.fillStyle = '#00F0FF';
     ctx.font = 'bold 14px sans-serif';
-    if (ch.number < 4) {
+    if (ch.id === 'final_trial') {
+      ctx.fillText('🏆 ALL-DISASTER GAUNTLET CLEARED (DEBUG SAVE ISOLATED)', w / 2, boxY + 106);
+    } else if (ch.number < 4 || (ch.number < 6 && this.game.debug?.canBypassChapterLocks())) {
       const nextMeta = this.getCardMeta(outcome.unlockedChapterId);
       ctx.fillText(`🔓 NEXT UNLOCKED: Chapter ${nextMeta.number} — ${nextMeta.title}`, w / 2, boxY + 106);
+    } else if (ch.number >= 5) {
+      ctx.fillText(`🌟 CHAPTER ${ch.number} DEBUG VISUAL TEST COMPLETED`, w / 2, boxY + 106);
     } else {
       ctx.fillText('🏆 PHASE 1 COMPLETE! Chapters 1–4 Cleared & All 4 Friends Rescued! (Ch. 5–6 in Phase 2)', w / 2, boxY + 106);
     }
 
     const btnY = boxY + 185;
-    if (ch.number < 4 && outcome.unlockedChapterId) {
+    if (ch.id !== 'final_trial' && outcome.unlockedChapterId && (ch.number < 4 || this.game.debug?.canBypassChapterLocks())) {
       ui.drawButton(ctx, 'rescue_next_btn', w / 2 - 280, btnY, 180, 46, '▶ NEXT CHAPTER', '#2ED573', '#FFFFFF', () => {
         this.startIntro(outcome.unlockedChapterId);
       });
@@ -1090,6 +1301,12 @@ class ChapterDirector {
       });
       ui.drawButton(ctx, 'rescue_menu_btn', w / 2 + 10, btnY, 180, 46, '🏠 MAIN MENU', '#2ED573', '#FFFFFF', () => {
         this.game.state = 'menu';
+      });
+    }
+
+    if (this.game.debug?.shouldShowDebugUI()) {
+      ui.drawButton(ctx, 'rescue_dev_btn', w - 166, 20, 146, 44, '🛠️ DEV PANEL', '#7B4EB2', '#FFFFFF', () => {
+        this.game.debug.openPanel();
       });
     }
 

@@ -2,6 +2,7 @@
 window.OopsWorld = window.OopsWorld || {};
 
 const STORAGE_KEY = 'oops_world_save_v1';
+const DEBUG_STORAGE_KEY = 'oops_world_debug_save_v1';
 
 const CHARACTERS = [
   {
@@ -210,6 +211,10 @@ const CHAPTER_TARGETS = {
 
 class StorageManager {
   constructor() {
+    this.debugMode = false;
+    this.normalSnapshot = null;
+    this.debugUnlockAllChapters = false;
+    this.debugUnlimitedCoins = false;
     this.memoryData = this.getDefaults();
     this.hasLocalStorage = this.checkStorage();
     this.load();
@@ -393,10 +398,138 @@ class StorageManager {
   save() {
     if (!this.hasLocalStorage) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.memoryData));
+      const targetKey = this.debugMode ? DEBUG_STORAGE_KEY : STORAGE_KEY;
+      window.localStorage.setItem(targetKey, JSON.stringify(this.memoryData));
     } catch (err) {
       console.warn('Failed to save to localStorage', err);
     }
+  }
+
+  enterDebugMode(flags = {}) {
+    if (!this.debugMode) {
+      this.normalSnapshot = JSON.parse(JSON.stringify(this.memoryData));
+    }
+    this.debugMode = true;
+
+    let loadedDebug = null;
+    if (this.hasLocalStorage) {
+      try {
+        const raw = window.localStorage.getItem(DEBUG_STORAGE_KEY);
+        if (raw) loadedDebug = JSON.parse(raw);
+      } catch (_) {}
+    }
+
+    const defs = this.getDefaults();
+    if (loadedDebug && typeof loadedDebug === 'object') {
+      this.memoryData = {
+        ...defs,
+        ...loadedDebug,
+        saveVersion: 3,
+        powerupUpgrades: { ...defs.powerupUpgrades, ...(loadedDebug.powerupUpgrades || {}) },
+        settings: { ...defs.settings, ...(this.normalSnapshot?.settings || {}), ...(loadedDebug.settings || {}) },
+        stats: { ...defs.stats, ...(loadedDebug.stats || {}) },
+        story: {
+          ...defs.story,
+          ...(loadedDebug.story || {}),
+          disasterCards: {
+            ...defs.story.disasterCards,
+            ...(loadedDebug.story?.disasterCards || {})
+          }
+        }
+      };
+    } else {
+      this.memoryData = {
+        ...defs,
+        settings: { ...defs.settings, ...(this.normalSnapshot?.settings || {}) },
+        story: {
+          ...defs.story,
+          openingCinematicWatched: true
+        }
+      };
+    }
+
+    this.migrateProgressionConsistency(false);
+    this.setDebugOverrides(flags);
+    this.save();
+  }
+
+  setDebugOverrides(flags = {}) {
+    if (!this.debugMode) return;
+    if (typeof flags.unlockAllChapters === 'boolean') {
+      this.debugUnlockAllChapters = flags.unlockAllChapters;
+    }
+    if (typeof flags.unlimitedCoins === 'boolean') {
+      this.debugUnlimitedCoins = flags.unlimitedCoins;
+    }
+    if (this.debugUnlimitedCoins) {
+      this.memoryData.totalCoins = Math.max(999999, Number(this.memoryData.totalCoins) || 0);
+    }
+    this.save();
+  }
+
+  exitDebugMode() {
+    if (!this.debugMode) return;
+    this.debugMode = false;
+    this.debugUnlockAllChapters = false;
+    this.debugUnlimitedCoins = false;
+
+    if (this.normalSnapshot) {
+      this.memoryData = JSON.parse(JSON.stringify(this.normalSnapshot));
+    } else {
+      this.memoryData = this.getDefaults();
+    }
+    this.normalSnapshot = null;
+    this.load();
+  }
+
+  resetDebugProgress() {
+    if (!this.debugMode) return false;
+    if (this.hasLocalStorage) {
+      try {
+        window.localStorage.removeItem(DEBUG_STORAGE_KEY);
+      } catch (_) {}
+    }
+    const defs = this.getDefaults();
+    this.memoryData = {
+      ...defs,
+      settings: { ...defs.settings, ...(this.normalSnapshot?.settings || {}) },
+      story: {
+        ...defs.story,
+        openingCinematicWatched: true
+      }
+    };
+    if (this.debugUnlimitedCoins) {
+      this.memoryData.totalCoins = 999999;
+    }
+    this.save();
+    return true;
+  }
+
+  markDebugMissionsCompleted(includePhase2 = true) {
+    if (!this.debugMode) return false;
+    const targets = includePhase2
+      ? CHAPTER_ORDER
+      : ['geophysical', 'hydrological', 'meteorological', 'climatological'];
+    targets.forEach((chId) => {
+      const card = this.memoryData.story.disasterCards[chId];
+      if (card) {
+        card.completed = true;
+        card.progress = card.target;
+      }
+      if (!this.memoryData.story.unlockedChapters.includes(chId)) {
+        this.memoryData.story.unlockedChapters.push(chId);
+      }
+      if (!this.memoryData.story.completedChapters.includes(chId)) {
+        this.memoryData.story.completedChapters.push(chId);
+      }
+      const friendId = CHAPTER_TARGETS[chId]?.friendId;
+      if (friendId && !this.memoryData.story.rescuedFriends.includes(friendId)) {
+        this.memoryData.story.rescuedFriends.push(friendId);
+      }
+    });
+    this.syncHeroUnlocksWithWorlds();
+    this.save();
+    return true;
   }
 
   get data() {
@@ -439,6 +572,9 @@ class StorageManager {
   }
 
   isChapterUnlocked(chapterId) {
+    if (this.debugMode && this.debugUnlockAllChapters && CHAPTER_ORDER.includes(chapterId)) {
+      return true;
+    }
     if (chapterId === 'geophysical') return true;
     return (this.memoryData.story?.unlockedChapters || []).includes(chapterId);
   }
@@ -582,9 +718,14 @@ class StorageManager {
     const lvl = this.getPowerupLevel(id);
     if (lvl >= def.maxLevel) return { success: false, reason: 'maxed' };
     const cost = def.costs[lvl];
-    if (this.memoryData.totalCoins < cost) return { success: false, reason: 'coins' };
+    const hasInfinite = this.debugMode && this.debugUnlimitedCoins;
+    if (!hasInfinite && this.memoryData.totalCoins < cost) return { success: false, reason: 'coins' };
 
-    this.memoryData.totalCoins -= cost;
+    if (!hasInfinite) {
+      this.memoryData.totalCoins -= cost;
+    } else {
+      this.memoryData.totalCoins = Math.max(999999, Number(this.memoryData.totalCoins) || 0);
+    }
     this.memoryData.powerupUpgrades[id] = lvl + 1;
     this.save();
     return { success: true, newLevel: lvl + 1, newDuration: this.getPowerupDuration(id) };

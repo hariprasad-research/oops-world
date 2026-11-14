@@ -429,6 +429,10 @@ class ObstacleManager {
   }
 
   update(dt, worldSpeed) {
+    if (this.game.debug?.shouldDisableObstacles()) {
+      this.obstacles = [];
+      return;
+    }
     const Utils = window.OopsWorld.Utils;
     this.spawnTimer -= dt;
 

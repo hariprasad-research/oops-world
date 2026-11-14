@@ -143,7 +143,7 @@ class World {
     this.weatherTimer -= dt;
     if (this.game.activeChapter) {
       const chId = this.game.activeChapter.id;
-      if (chId === 'meteorological') this.weather = 'storm';
+      if (chId === 'meteorological' || chId === 'final_trial') this.weather = 'storm';
       else if (chId === 'hydrological') this.weather = 'rain';
       else if (chId === 'climatological') {
         this.weather = this.game.chapters?.climateMode === 'freeze' ? 'snow' : 'clear';
@@ -213,7 +213,7 @@ class World {
   generateNextChunk(lastChunk) {
     const Utils = window.OopsWorld.Utils;
     const nextX = lastChunk.x + lastChunk.width;
-    const canSpawnGap = this.distance > 80 && !lastChunk.isGap && this.chunks.filter((c) => c.isGap).length === 0;
+    const canSpawnGap = !this.game.debug?.shouldDisableObstacles() && this.distance > 80 && !lastChunk.isGap && this.chunks.filter((c) => c.isGap).length === 0;
 
     const isGap = canSpawnGap && Math.random() < 0.16;
 
@@ -301,7 +301,7 @@ class World {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, this.game.width, this.game.height);
 
-    if (cycle >= 0.5 || this.theme.id === 'cosmic') {
+    if (cycle >= 0.5 || this.theme.id === 'cosmic' || this.theme.id === 'extraterrestrial' || this.theme.id === 'final_trial') {
       ctx.save();
       ctx.fillStyle = '#FFFFFF';
       for (let i = 0; i < 35; i++) {

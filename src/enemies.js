@@ -371,6 +371,10 @@ class EnemyManager {
   }
 
   update(dt, worldSpeed) {
+    if (this.game.debug?.shouldDisableObstacles()) {
+      this.enemies = [];
+      return;
+    }
     const Utils = window.OopsWorld.Utils;
     this.spawnTimer -= dt;
 

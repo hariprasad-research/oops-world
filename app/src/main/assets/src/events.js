@@ -37,6 +37,15 @@ class SurpriseEventManager {
   }
 
   update(dt, worldSpeed) {
+    if (this.game.debug?.shouldDisableObstacles()) {
+      if (this.state !== 'idle' && this.currentEvent !== EVENT_TYPES.COIN_FEVER) {
+        this.state = 'idle';
+        this.entities = [];
+        this.game.player.gravity = 1400;
+      }
+      return;
+    }
+
     if (this.state === 'idle') {
       if (this.game.world.distance >= this.nextEventDistance) {
         this.startWarning();

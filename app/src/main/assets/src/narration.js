@@ -659,8 +659,14 @@ class NarrationManager {
       this.game.state = 'menu';
     } else if (this.activeMode === 'conclusion') {
       this.game.storage.markPart1ConclusionWatched();
-      this.game.state = 'disasters';
-      this.game.hudToast('🌟 PART 2 TRAILER UNLOCKED IN DISASTER EXPEDITIONS!', '#FFD700', 4.0);
+      if (this.game.debug?.lastCinematicFromDebug) {
+        this.game.debug.lastCinematicFromDebug = false;
+        this.game.state = 'dev_panel';
+        this.game.hudToast('🎬 PART 1 ENDING TEST COMPLETE', '#A55EEA', 2.8);
+      } else {
+        this.game.state = 'disasters';
+        this.game.hudToast('🌟 PART 2 TRAILER UNLOCKED IN DISASTER EXPEDITIONS!', '#FFD700', 4.0);
+      }
     } else if (this.activeMode === 'trailer') {
       this.game.state = 'disasters';
     } else {

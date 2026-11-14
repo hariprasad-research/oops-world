@@ -1,5 +1,4 @@
-
-name: Build & Release Android APK
+name: Build & Release Android APK / AAB
 
 on:
   push:
@@ -7,25 +6,91 @@ on:
       - main
       - master
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Select Android build output to generate'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - development
+          - production_apk
+          - production_aab
+      publish_release:
+        description: 'Publish a GitHub Release when production outputs are built (automatic on push)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build & Publish Release APK
+  build_and_release:
+    name: Build & Package Android Outputs
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Resolve Build Targets
+        id: targets
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET="${{ inputs.build_target }}"
+            SHOULD_PUBLISH="${{ inputs.publish_release }}"
+          else
+            TARGET="all"
+            SHOULD_PUBLISH="true"
+          fi
+
+          BUILD_DEV="false"
+          BUILD_PROD_APK="false"
+          BUILD_PROD_AAB="false"
+
+          case "$TARGET" in
+            development)
+              BUILD_DEV="true"
+              ;;
+            production_apk)
+              BUILD_PROD_APK="true"
+              ;;
+            production_aab)
+              BUILD_PROD_AAB="true"
+              ;;
+            all)
+              BUILD_DEV="true"
+              BUILD_PROD_APK="true"
+              BUILD_PROD_AAB="true"
+              ;;
+            *)
+              echo "::error::Unsupported build_target: $TARGET"
+              exit 1
+              ;;
+          esac
+
+          if [ "$BUILD_PROD_APK" != "true" ] && [ "$BUILD_PROD_AAB" != "true" ]; then
+            SHOULD_PUBLISH="false"
+          fi
+
+          {
+            echo "target=$TARGET"
+            echo "build_dev=$BUILD_DEV"
+            echo "build_prod_apk=$BUILD_PROD_APK"
+            echo "build_prod_aab=$BUILD_PROD_AAB"
+            echo "should_publish=$SHOULD_PUBLISH"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Resolved build_target=$TARGET (dev=$BUILD_DEV, prod_apk=$BUILD_PROD_APK, prod_aab=$BUILD_PROD_AAB, publish_release=$SHOULD_PUBLISH)"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '21'
 
       - name: Setup Gradle
@@ -38,38 +103,80 @@ jobs:
         run: touch .env
 
       - name: Configure Release Signing Credentials
+        if: steps.targets.outputs.build_prod_apk == 'true' || steps.targets.outputs.build_prod_aab == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ] || \
-             [ -z "$STORE_PASSWORD" ] || \
-             [ -z "$KEY_PASSWORD" ]; then
-            echo "::error::Release signing secrets are missing."
-            echo "Configure KEYSTORE_BASE64, STORE_PASSWORD and KEY_PASSWORD."
-            exit 1
-          fi
-
           KEYSTORE_PATH="${{ github.workspace }}/my-upload-key.jks"
+          TMP_DEBUG_KEYSTORE="${RUNNER_TEMP:-/tmp}/debug-fallback.keystore"
 
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ]; then
+            if ! printf '%s' "$KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > "$KEYSTORE_PATH" 2>/dev/null || [ ! -s "$KEYSTORE_PATH" ]; then
+              echo "::error::Failed to decode KEYSTORE_BASE64 into a valid keystore file."
+              rm -f "$KEYSTORE_PATH"
+              exit 1
+            fi
 
-          if [ ! -s "$KEYSTORE_PATH" ]; then
-            echo "::error::Keystore file is empty or invalid."
-            exit 1
+            if ! keytool -list -keystore "$KEYSTORE_PATH" -alias upload -storepass "$STORE_PASSWORD" >/dev/null 2>&1; then
+              echo "::error::Decoded keystore is invalid, STORE_PASSWORD is incorrect, or alias 'upload' is missing."
+              rm -f "$KEYSTORE_PATH"
+              exit 1
+            fi
+
+            chmod 600 "$KEYSTORE_PATH"
+            {
+              echo "KEYSTORE_PATH=$KEYSTORE_PATH"
+              echo "STORE_PASSWORD=$STORE_PASSWORD"
+              echo "KEY_PASSWORD=$KEY_PASSWORD"
+              echo "RELEASE_SIGNING_MODE=production"
+            } >> "$GITHUB_ENV"
+
+            echo "::notice::Persistent production upload keystore configured from GitHub Secrets."
+          else
+            if [ -n "$KEYSTORE_BASE64" ] || [ -n "$STORE_PASSWORD" ] || [ -n "$KEY_PASSWORD" ]; then
+              echo "::warning::Release signing secrets are incomplete. All three secrets (KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD) are required for production signing."
+            else
+              echo "::warning::Release signing secrets (KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD) are not configured."
+            fi
+            echo "::warning::Falling back to consistent repository debug signing key (debug.keystore.base64). Do not upload fallback-signed builds to Google Play Console."
+
+            if [ ! -f "debug.keystore.base64" ]; then
+              echo "::error::Fallback keystore template debug.keystore.base64 not found, and signing secrets are missing."
+              exit 1
+            fi
+
+            FALLBACK_PASS="android"
+            tr -d '\n\r ' < debug.keystore.base64 | base64 --decode > "$TMP_DEBUG_KEYSTORE"
+            rm -f "$KEYSTORE_PATH"
+
+            keytool -importkeystore -noprompt \
+              -srckeystore "$TMP_DEBUG_KEYSTORE" \
+              -srcstorepass "$FALLBACK_PASS" \
+              -srcalias "androiddebugkey" \
+              -srckeypass "$FALLBACK_PASS" \
+              -destkeystore "$KEYSTORE_PATH" \
+              -deststorepass "$FALLBACK_PASS" \
+              -destalias "upload" \
+              -destkeypass "$FALLBACK_PASS" >/dev/null 2>&1
+
+            rm -f "$TMP_DEBUG_KEYSTORE"
+            chmod 600 "$KEYSTORE_PATH"
+
+            {
+              echo "KEYSTORE_PATH=$KEYSTORE_PATH"
+              echo "STORE_PASSWORD=$FALLBACK_PASS"
+              echo "KEY_PASSWORD=$FALLBACK_PASS"
+              echo "RELEASE_SIGNING_MODE=fallback"
+            } >> "$GITHUB_ENV"
           fi
-
-          echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-
-          echo "::notice::Persistent release signing keystore configured."
 
       - name: Determine Semantic Release Tag
         id: semver
         run: |
           RAW_VERSION=$(grep -E 'versionName\s*=\s*' app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+          RAW_CODE=$(grep -E 'versionCode\s*=\s*' app/build.gradle.kts | head -n 1 | sed -E 's/[^0-9]*([0-9]+).*/\1/')
 
           if [ -z "$RAW_VERSION" ]; then
             RAW_VERSION="1.0.0"
@@ -85,66 +192,172 @@ jobs:
 
           TARGET_TAG="v${SEM_VERSION}"
 
-          git fetch --tags --force 2>/dev/null || true
+          if [ "${{ steps.targets.outputs.should_publish }}" = "true" ]; then
+            git fetch --tags --force 2>/dev/null || true
 
-          if git rev-parse "$TARGET_TAG" >/dev/null 2>&1 || \
-             git ls-remote --tags origin "refs/tags/$TARGET_TAG" | grep -q "$TARGET_TAG"; then
+            if git rev-parse "$TARGET_TAG" >/dev/null 2>&1 || \
+               git ls-remote --tags origin "refs/tags/$TARGET_TAG" | grep -q "$TARGET_TAG"; then
 
-            echo "Tag $TARGET_TAG already exists. Incrementing patch version..."
+              echo "Tag $TARGET_TAG already exists. Incrementing patch version..."
 
-            MAJOR_MINOR=$(echo "$SEM_VERSION" | cut -d'.' -f1,2)
-            CURRENT_PATCH=$(echo "$SEM_VERSION" | cut -d'.' -f3)
-            MAX_PATCH=$((CURRENT_PATCH + 1))
+              MAJOR_MINOR=$(echo "$SEM_VERSION" | cut -d'.' -f1,2)
+              CURRENT_PATCH=$(echo "$SEM_VERSION" | cut -d'.' -f3)
+              CURRENT_PATCH=${CURRENT_PATCH%%[^0-9]*}
+              CURRENT_PATCH=${CURRENT_PATCH:-0}
+              MAX_PATCH=$((CURRENT_PATCH + 1))
 
-            for existing_tag in $(git tag -l "v${MAJOR_MINOR}.*"); do
-              TAG_PATCH=$(echo "$existing_tag" | sed -E "s/^v${MAJOR_MINOR}\.//" | grep -E '^[0-9]+$' || true)
+              for existing_tag in $(git tag -l "v${MAJOR_MINOR}.*"); do
+                TAG_PATCH=$(echo "$existing_tag" | sed -E "s/^v${MAJOR_MINOR}\.//" | grep -E '^[0-9]+$' || true)
 
-              if [ -n "$TAG_PATCH" ] && [ "$TAG_PATCH" -ge "$MAX_PATCH" ]; then
-                MAX_PATCH=$((TAG_PATCH + 1))
-              fi
-            done
+                if [ -n "$TAG_PATCH" ] && [ "$TAG_PATCH" -ge "$MAX_PATCH" ]; then
+                  MAX_PATCH=$((TAG_PATCH + 1))
+                fi
+              done
 
-            TARGET_TAG="v${MAJOR_MINOR}.${MAX_PATCH}"
+              TARGET_TAG="v${MAJOR_MINOR}.${MAX_PATCH}"
+            fi
           fi
 
-          echo "Final Semantic Version Tag: $TARGET_TAG"
-          echo "RELEASE_TAG=$TARGET_TAG" >> "$GITHUB_ENV"
-          echo "VERSION_NAME=$SEM_VERSION" >> "$GITHUB_ENV"
+          {
+            echo "RELEASE_TAG=$TARGET_TAG"
+            echo "VERSION_NAME=$SEM_VERSION"
+            echo "VERSION_CODE=${RAW_CODE:-1}"
+          } >> "$GITHUB_ENV"
 
-      - name: Build Release APK
+          echo "Resolved versionName=$SEM_VERSION (versionCode=${RAW_CODE:-1}), tag=$TARGET_TAG"
+
+      - name: Run Unit Tests
         run: |
           if [ -f "./gradlew" ]; then
             chmod +x ./gradlew
+            ./gradlew :app:testDebugUnitTest --stacktrace
+          else
+            gradle :app:testDebugUnitTest --stacktrace
+          fi
+
+      - name: Build Development APK
+        if: steps.targets.outputs.build_dev == 'true'
+        run: |
+          mkdir -p dist/dev
+          if [ -f "./gradlew" ]; then
+            ./gradlew :app:assembleDebug --stacktrace
+          else
+            gradle :app:assembleDebug --stacktrace
+          fi
+
+          BUILT_DEV_APK=$(find app/build/outputs/apk/debug -name "*.apk" -type f | head -n 1)
+          if [ -z "$BUILT_DEV_APK" ] || [ ! -f "$BUILT_DEV_APK" ]; then
+            echo "::error::Development APK not found!"
+            exit 1
+          fi
+
+          cp "$BUILT_DEV_APK" "dist/dev/OOPS-WORLD-DEV.apk"
+          sha256sum "dist/dev/OOPS-WORLD-DEV.apk" > "dist/dev/OOPS-WORLD-DEV.apk.sha256"
+
+          {
+            echo "DEV_APK_PATH=dist/dev/OOPS-WORLD-DEV.apk"
+            echo "DEV_APK_SHA256=$(cut -d' ' -f1 dist/dev/OOPS-WORLD-DEV.apk.sha256)"
+            echo "DEV_APK_SIZE=$(du -h dist/dev/OOPS-WORLD-DEV.apk | cut -f1)"
+          } >> "$GITHUB_ENV"
+
+      - name: Build Production Testing APK
+        if: steps.targets.outputs.build_prod_apk == 'true'
+        run: |
+          mkdir -p dist/prod-apk
+          if [ -f "./gradlew" ]; then
             ./gradlew :app:assembleRelease --stacktrace
           else
             gradle :app:assembleRelease --stacktrace
           fi
 
-      - name: Prepare Release APK Asset
-        id: prepare_asset
-        run: |
-          BUILT_APK=$(find app/build/outputs/apk/release -name "*.apk" -type f | head -n 1)
-
-          if [ -z "$BUILT_APK" ] || [ ! -f "$BUILT_APK" ]; then
-            echo "::error::Release APK not found!"
+          BUILT_PROD_APK=$(find app/build/outputs/apk/release -name "*.apk" -type f | head -n 1)
+          if [ -z "$BUILT_PROD_APK" ] || [ ! -f "$BUILT_PROD_APK" ]; then
+            echo "::error::Production Testing APK not found!"
             exit 1
           fi
 
-          OUTPUT_APK="OOPS-WORLD-${RELEASE_TAG}.apk"
+          cp "$BUILT_PROD_APK" "dist/prod-apk/OOPS-WORLD-PRODUCTION.apk"
+          sha256sum "dist/prod-apk/OOPS-WORLD-PRODUCTION.apk" > "dist/prod-apk/OOPS-WORLD-PRODUCTION.apk.sha256"
 
-          cp "$BUILT_APK" "$OUTPUT_APK"
+          {
+            echo "PROD_APK_PATH=dist/prod-apk/OOPS-WORLD-PRODUCTION.apk"
+            echo "PROD_APK_SHA256=$(cut -d' ' -f1 dist/prod-apk/OOPS-WORLD-PRODUCTION.apk.sha256)"
+            echo "PROD_APK_SIZE=$(du -h dist/prod-apk/OOPS-WORLD-PRODUCTION.apk | cut -f1)"
+          } >> "$GITHUB_ENV"
 
-          SHA256=$(sha256sum "$OUTPUT_APK" | cut -d' ' -f1)
-          FILE_SIZE=$(du -h "$OUTPUT_APK" | cut -f1)
+      - name: Build Production Release AAB
+        if: steps.targets.outputs.build_prod_aab == 'true'
+        run: |
+          mkdir -p dist/prod-aab
+          if [ -f "./gradlew" ]; then
+            ./gradlew :app:bundleRelease --stacktrace
+          else
+            gradle :app:bundleRelease --stacktrace
+          fi
 
-          echo "APK_PATH=$OUTPUT_APK" >> "$GITHUB_ENV"
-          echo "APK_FILENAME=$OUTPUT_APK" >> "$GITHUB_ENV"
-          echo "APK_SHA256=$SHA256" >> "$GITHUB_ENV"
-          echo "APK_SIZE=$FILE_SIZE" >> "$GITHUB_ENV"
+          BUILT_PROD_AAB=$(find app/build/outputs/bundle/release -name "*.aab" -type f | head -n 1)
+          if [ -z "$BUILT_PROD_AAB" ] || [ ! -f "$BUILT_PROD_AAB" ]; then
+            echo "::error::Production Release AAB not found!"
+            exit 1
+          fi
 
-          echo "Successfully prepared: $OUTPUT_APK ($FILE_SIZE)"
+          cp "$BUILT_PROD_AAB" "dist/prod-aab/OOPS-WORLD-RELEASE.aab"
+          sha256sum "dist/prod-aab/OOPS-WORLD-RELEASE.aab" > "dist/prod-aab/OOPS-WORLD-RELEASE.aab.sha256"
+
+          {
+            echo "PROD_AAB_PATH=dist/prod-aab/OOPS-WORLD-RELEASE.aab"
+            echo "PROD_AAB_SHA256=$(cut -d' ' -f1 dist/prod-aab/OOPS-WORLD-RELEASE.aab.sha256)"
+            echo "PROD_AAB_SIZE=$(du -h dist/prod-aab/OOPS-WORLD-RELEASE.aab | cut -f1)"
+          } >> "$GITHUB_ENV"
+
+      - name: Upload Development APK Artifact
+        if: steps.targets.outputs.build_dev == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: OOPS-WORLD-DEV.apk
+          path: |
+            dist/dev/OOPS-WORLD-DEV.apk
+            dist/dev/OOPS-WORLD-DEV.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Production Testing APK Artifact
+        if: steps.targets.outputs.build_prod_apk == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: OOPS-WORLD-PRODUCTION.apk
+          path: |
+            dist/prod-apk/OOPS-WORLD-PRODUCTION.apk
+            dist/prod-apk/OOPS-WORLD-PRODUCTION.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Production Release AAB Artifact
+        if: steps.targets.outputs.build_prod_aab == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: OOPS-WORLD-RELEASE.aab
+          path: |
+            dist/prod-aab/OOPS-WORLD-RELEASE.aab
+            dist/prod-aab/OOPS-WORLD-RELEASE.aab.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Collect Release Assets
+        if: steps.targets.outputs.should_publish == 'true'
+        run: |
+          mkdir -p dist/release-assets
+          if [ -f "dist/prod-apk/OOPS-WORLD-PRODUCTION.apk" ]; then
+            cp "dist/prod-apk/OOPS-WORLD-PRODUCTION.apk" "dist/release-assets/OOPS-WORLD-PRODUCTION.apk"
+            cp "dist/prod-apk/OOPS-WORLD-PRODUCTION.apk.sha256" "dist/release-assets/OOPS-WORLD-PRODUCTION.apk.sha256"
+          fi
+          if [ -f "dist/prod-aab/OOPS-WORLD-RELEASE.aab" ]; then
+            cp "dist/prod-aab/OOPS-WORLD-RELEASE.aab" "dist/release-assets/OOPS-WORLD-RELEASE.aab"
+            cp "dist/prod-aab/OOPS-WORLD-RELEASE.aab.sha256" "dist/release-assets/OOPS-WORLD-RELEASE.aab.sha256"
+          fi
 
       - name: Publish GitHub Release
+        if: steps.targets.outputs.should_publish == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
@@ -154,19 +367,18 @@ jobs:
           make_latest: true
           generate_release_notes: false
           body: |
-            Official Android release build of OOPS! WORLD.
+            Official Android release build of OOPS! WORLD (`v${{ env.VERSION_NAME }}`, versionCode `${{ env.VERSION_CODE }}`).
 
-            Release Asset:
-            - Download: ${{ env.APK_FILENAME }}
-            - File Size: ${{ env.APK_SIZE }}
-            - SHA-256: ${{ env.APK_SHA256 }}
+            Production Release Assets:
+            - **Production Testing APK**: `OOPS-WORLD-PRODUCTION.apk` (${{ env.PROD_APK_SIZE || 'not built' }}) — SHA-256: `${{ env.PROD_APK_SHA256 || 'n/a' }}`
+            - **Google Play App Bundle**: `OOPS-WORLD-RELEASE.aab` (${{ env.PROD_AAB_SIZE || 'not built' }}) — SHA-256: `${{ env.PROD_AAB_SHA256 || 'n/a' }}`
+            - **Release Signing Mode**: `${{ env.RELEASE_SIGNING_MODE || 'n/a' }}`
 
-            Installation:
-            1. Download the APK.
-            2. Open the downloaded APK.
-            3. Install the application.
-            4. Launch OOPS! WORLD and play!
-          files: ${{ env.APK_PATH }}
+            Sideload Installation (Testing APK):
+            1. Download `OOPS-WORLD-PRODUCTION.apk`.
+            2. Open the downloaded APK on your Android device and approve installation.
+            3. Launch OOPS! WORLD and play!
+          files: dist/release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -174,25 +386,32 @@ jobs:
         if: always()
         run: |
           if [ "${{ job.status }}" = "success" ]; then
-            cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
-          ### 🚀 Android Release Published Successfully!
-
-          | Item | Detail |
-          | --- | --- |
-          | Release Tag | `${{ env.RELEASE_TAG }}` |
-          | Package | `${{ env.APK_FILENAME }}` |
-          | File Size | `${{ env.APK_SIZE }}` |
-          | SHA-256 | `${{ env.APK_SHA256 }}` |
-          | Commit | `${{ github.sha }}` |
-
-          The release APK has been attached to GitHub Releases.
-          EOF
+            {
+              echo "### 🚀 OOPS! WORLD Android Build Summary"
+              echo ""
+              echo "- **Target**: \`${{ steps.targets.outputs.target }}\`"
+              echo "- **Version**: \`${{ env.VERSION_NAME }}\` (code \`${{ env.VERSION_CODE }}\`)"
+              echo "- **Release Signing Mode**: \`${{ env.RELEASE_SIGNING_MODE || 'debug-only' }}\`"
+              echo "- **Commit**: \`${{ github.sha }}\`"
+              echo ""
+              echo "| Output | Variant | Package ID | Size | SHA-256 |"
+              echo "| --- | --- | --- | --- | --- |"
+              if [ "${{ steps.targets.outputs.build_dev }}" = "true" ]; then
+                echo "| \`OOPS-WORLD-DEV.apk\` | \`debug\` (Dev Mode ON) | \`com.aistudio.oopsworld.jkyrqv.dev\` | \`${{ env.DEV_APK_SIZE }}\` | \`${{ env.DEV_APK_SHA256 }}\` |"
+              fi
+              if [ "${{ steps.targets.outputs.build_prod_apk }}" = "true" ]; then
+                echo "| \`OOPS-WORLD-PRODUCTION.apk\` | \`release\` (Prod APK) | \`com.aistudio.oopsworld.jkyrqv\` | \`${{ env.PROD_APK_SIZE }}\` | \`${{ env.PROD_APK_SHA256 }}\` |"
+              fi
+              if [ "${{ steps.targets.outputs.build_prod_aab }}" = "true" ]; then
+                echo "| \`OOPS-WORLD-RELEASE.aab\` | \`release\` (Play AAB) | \`com.aistudio.oopsworld.jkyrqv\` | \`${{ env.PROD_AAB_SIZE }}\` | \`${{ env.PROD_AAB_SHA256 }}\` |"
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### ❌ Build & Release Failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "### ❌ Android Build Workflow Failed" >> "$GITHUB_STEP_SUMMARY"
             echo "Please inspect the workflow logs." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Clean up Keystore
         if: always()
         run: |
-          rm -f "${{ github.workspace }}/my-upload-key.jks"
+          rm -f "${{ github.workspace }}/my-upload-key.jks" "${RUNNER_TEMP:-/tmp}/debug-fallback.keystore"

@@ -195,6 +195,7 @@ class Player {
   }
 
   takeDamage(amount = 1) {
+    if (this.game.debug?.shouldPreventDamage()) return false;
     if (this.invincibleTimer > 0) return false;
 
     if (this.powerups.speedTimer > 0) {
@@ -306,6 +307,27 @@ class Player {
       this.powerups.slowMoTimer -= dt;
     }
 
+    if (this.game.debug?.shouldPreventDamage()) {
+      this.health = this.maxHealth;
+    }
+
+    if (this.game.debug?.hasUnlimitedPowerups()) {
+      this.powerups.shield = true;
+      this.powerups.shieldTimer = Math.max(this.powerups.shieldTimer, this.powerups.shieldMax || 10);
+      if (this.powerups.magnetTimer > 0) {
+        this.powerups.magnetTimer = Math.max(this.powerups.magnetTimer, this.powerups.magnetMax || 12);
+      }
+      if (this.powerups.speedTimer > 0) {
+        this.powerups.speedTimer = Math.max(this.powerups.speedTimer, this.powerups.speedMax || 8);
+      }
+      if (this.powerups.doubleCoinsTimer > 0) {
+        this.powerups.doubleCoinsTimer = Math.max(this.powerups.doubleCoinsTimer, this.powerups.doubleCoinsMax || 12);
+      }
+      if (this.powerups.slowMoTimer > 0) {
+        this.powerups.slowMoTimer = Math.max(this.powerups.slowMoTimer, this.powerups.slowMoMax || 8);
+      }
+    }
+
     this.blinkTimer -= dt;
     if (this.blinkTimer <= 0) {
       this.isBlinking = !this.isBlinking;
@@ -372,7 +394,19 @@ class Player {
     }
 
     if (this.y > this.game.height + 60) {
-      this.takeDamage(this.health);
+      if (this.game.debug?.shouldPreventDamage()) {
+        const safeGround = this.game.world.getGroundAt(this.x);
+        const safeY = (!safeGround.isGap && safeGround.y) ? safeGround.y : this.game.world.groundY;
+        this.y = Math.min(safeY, 320) - 90;
+        this.vy = -420;
+        this.isGrounded = false;
+        this.canDoubleJump = true;
+        this.hasDoubleJumped = false;
+        this.invincibleTimer = Math.max(this.invincibleTimer, 1.2);
+        this.state = PLAYER_STATES.JUMPING;
+      } else {
+        this.takeDamage(this.health);
+      }
     }
 
     this.scaleX = Utils.lerp(this.scaleX, 1, 10 * dt);

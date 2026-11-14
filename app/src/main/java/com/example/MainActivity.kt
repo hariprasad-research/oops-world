@@ -132,6 +132,9 @@ class AndroidBridge(private val context: Context) {
 
   @JavascriptInterface
   fun isAndroidApp(): Boolean = true
+
+  @JavascriptInterface
+  fun isDebugBuild(): Boolean = BuildConfig.DEBUG && BuildConfig.ENABLE_DEV_MODE
 }
 
 @SuppressLint("SetJavaScriptEnabled")

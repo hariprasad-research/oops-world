@@ -226,6 +226,16 @@ class SoundEngine {
     this.tone({ freq: 700, endFreq: 400, type: 'triangle', duration: 0.05, gain: 0.15 });
   }
 
+  playDebugActivate() {
+    this.init();
+    const notes = [392.0, 523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      setTimeout(() => {
+        this.tone({ freq, type: 'triangle', duration: 0.14, gain: 0.28 });
+      }, i * 55);
+    });
+  }
+
   startMusic() {
     if (this.musicPlaying) return;
     this.musicPlaying = true;

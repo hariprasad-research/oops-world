@@ -21,6 +21,7 @@ class Game {
       PowerupManager,
       SurpriseEventManager,
       ChapterDirector,
+      DebugManager,
       UIManager,
       NarrationManager
     } = window.OopsWorld;
@@ -32,6 +33,7 @@ class Game {
 
     this.activeChapter = null;
     this.chapters = new ChapterDirector(this);
+    this.debug = new DebugManager(this);
 
     this.world = new World(this);
     this.player = new Player(this);
@@ -453,7 +455,8 @@ class Game {
 
   startChapter(chapterId) {
     const meta = this.chapters.getCardMeta(chapterId);
-    if (!meta || !meta.playableInPhase1) {
+    const debugBypass = this.debug?.canBypassChapterLocks();
+    if (!meta || (!meta.playableInPhase1 && !debugBypass)) {
       this.hudToast('🔒 Available in Phase 2!', '#FFA502', 2.4);
       return false;
     }
@@ -599,7 +602,9 @@ class Game {
   }
 
   handleBackPress() {
-    if (this.state === 'cinematic') {
+    if (this.state === 'dev_panel') {
+      this.debug?.closePanel();
+    } else if (this.state === 'cinematic') {
       this.narration.skipCinematic();
     } else if (this.state === 'playing') {
       this.togglePause();
@@ -618,6 +623,11 @@ class Game {
   }
 
   onPlayerDied() {
+    if (this.debug?.shouldPreventDamage()) {
+      this.player.health = this.player.maxHealth;
+      this.player.state = window.OopsWorld.PLAYER_STATES.RUNNING;
+      return;
+    }
     this.state = 'gameover';
     this.audio.stopMusic();
     this.audio.playGameOver();
@@ -656,12 +666,19 @@ class Game {
   update(dt) {
     if (this.isOrientationBlocked) return;
 
+    if (this.prevState === 'menu' && this.state !== 'menu') {
+      this.debug?.resetMoonClickCount();
+    }
+    if (this.state === 'dev_panel' && !this.debug?.shouldShowDebugUI()) {
+      this.state = 'menu';
+    }
     if (this.prevState === 'cinematic' && this.state === 'menu') {
       this.ui.triggerMenuFadeIn();
     }
     this.prevState = this.state;
 
     this.updateMobileControlsVisibility();
+    this.debug?.update(dt);
 
     if (this.state === 'cinematic') {
       this.narration.update(dt);

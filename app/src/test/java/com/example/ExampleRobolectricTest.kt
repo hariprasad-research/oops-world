@@ -13,9 +13,15 @@ import org.robolectric.annotation.Config
 class ExampleRobolectricTest {
 
   @Test
-  fun `read string from context`() {
+  fun `debug build uses dev suffix, dev app name, and enables dev mode`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
-    assertEquals("OOPS! WORLD", appName)
+    assertEquals(if (BuildConfig.DEBUG) "OOPS! WORLD (Dev)" else "OOPS! WORLD", appName)
+    assertEquals(BuildConfig.DEBUG, BuildConfig.ENABLE_DEV_MODE)
+    if (BuildConfig.DEBUG) {
+      assertEquals("com.aistudio.oopsworld.jkyrqv.dev", context.packageName)
+    } else {
+      assertEquals("com.aistudio.oopsworld.jkyrqv", context.packageName)
+    }
   }
 }
